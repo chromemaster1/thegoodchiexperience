@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Post - Goodchi experience{% endblock %}
+
+{% block content %}
+<article class="post featured">
+	<header class="major">
+		<h2>✏️ Edit Post</h2>
+		<p>{{ post.title }}</p>
+	</header>
+
+	<form method="POST" action="{{ url_for('admin_edit_post', post_id=post.id) }}" style="max-width: 100%;">
+		<div style="margin-bottom: 20px;">
+			<label for="slug" style="display: block; margin-bottom: 8px; font-weight: bold;">Slug *</label>
+			<input type="text" name="slug" id="slug" required value="{{ post.slug }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+			<small style="display: block; margin-top: 5px; color: #666;">URL-friendly identifier (lowercase, hyphens only, no spaces)</small>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="title" style="display: block; margin-bottom: 8px; font-weight: bold;">Title *</label>
+			<input type="text" name="title" id="title" required value="{{ post.title }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="excerpt" style="display: block; margin-bottom: 8px; font-weight: bold;">Excerpt *</label>
+			<textarea name="excerpt" id="excerpt" required rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: Arial, sans-serif;">{{ post.excerpt }}</textarea>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="content" style="display: block; margin-bottom: 8px; font-weight: bold;">Content * (HTML supported)</label>
+			<textarea name="content" id="content" required rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: monospace;">{{ post.content }}</textarea>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="date" style="display: block; margin-bottom: 8px; font-weight: bold;">Date *</label>
+			<input type="text" name="date" id="date" required value="{{ post.date }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+			<small style="display: block; margin-top: 5px; color: #666;">Format: Month Day, Year</small>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="image" style="display: block; margin-bottom: 8px; font-weight: bold;">Image Path *</label>
+			<input type="text" name="image" id="image" required value="{{ post.image }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+			<small style="display: block; margin-top: 5px; color: #666;">Path relative to static folder (e.g., images/photo.jpg)</small>
+		</div>
+
+		<div style="margin-top: 30px; display: flex; gap: 10px;">
+			<button type="submit" class="button primary">✅ Save Changes</button>
+			<a href="{{ url_for('admin_posts') }}" class="button">Cancel</a>
+		</div>
+	</form>
+
+	<hr style="margin: 40px 0;">
+
+	<div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin-top: 20px;">
+		<strong>Preview:</strong>
+		<p style="margin-top: 10px; font-size: 14px;">
+			<strong>Slug:</strong> {{ post.slug }}<br>
+			<strong>Title:</strong> {{ post.title }}<br>
+			<strong>Date:</strong> {{ post.date }}<br>
+			<strong>Image:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{ post.image }}</code>
+		</p>
+	</div>
+</article>
+{% endblock %}

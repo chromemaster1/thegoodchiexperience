@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Contact - Goodchi experience{% endblock %}
+
+{% block content %}
+<section style="display: flex; justify-content: center; align-items: center; min-height: 70vh; padding: 20px; background: linear-gradient(135deg, rgba(138, 43, 226, 0.05) 0%, rgba(25, 25, 112, 0.05) 100%);">
+	<div style="width: 100%; max-width: 650px; padding: 50px; background: rgba(15, 15, 35, 0.8); border-radius: 15px; box-shadow: 0 8px 32px rgba(138, 43, 226, 0.3), inset 0 0 20px rgba(138, 43, 226, 0.1); border: 2px solid rgba(138, 43, 226, 0.3); backdrop-filter: blur(10px);">
+		<div style="text-align: center; margin-bottom: 40px;">
+			<h2 style="font-size: 32px; margin: 0 0 10px 0; background: linear-gradient(135deg, #8a2be2 0%, #00d4ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">💌 Get In Touch</h2>
+			<p style="color: #999; font-size: 14px; margin: 10px 0 0 0;">Send us a message and let's explore possibilities together</p>
+		</div>
+
+		{% with messages = get_flashed_messages(with_categories=true) %}
+			{% if messages %}
+				{% for category, message in messages %}
+					<div style="padding: 14px 16px; margin-bottom: 25px; border-radius: 8px; font-size: 14px; {% if category == 'success' %}background-color: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid #22c55e;{% else %}background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444;{% endif %}">
+						{{ message }}
+					</div>
+				{% endfor %}
+			{% endif %}
+		{% endwith %}
+
+		<form method="post" novalidate style="display: flex; flex-direction: column;">
+			{{ form.hidden_tag() }}
+			
+			<div style="margin-bottom: 25px;">
+				<label for="name" style="display: block; margin-bottom: 8px; font-weight: 600; color: #00d4ff;">👤 Your Name</label>
+				{{ form.name(class="contact-input", placeholder="What should we call you?", style="width: 100%; padding: 12px 15px; border: 1.5px solid rgba(138, 43, 226, 0.3); border-radius: 8px; background: rgba(30, 30, 60, 0.5); color: white; font-size: 14px; box-sizing: border-box; transition: all 0.3s ease;") }}
+				{% if form.name.errors %}
+					<div style="color: #ef4444; font-size: 12px; margin-top: 5px;">{{ form.name.errors[0] }}</div>
+				{% endif %}
+			</div>
+
+			<div style="margin-bottom: 25px;">
+				<label for="email" style="display: block; margin-bottom: 8px; font-weight: 600; color: #00d4ff;">📧 Email Address</label>
+				{{ form.email(class="contact-input", placeholder="your.email@example.com", style="width: 100%; padding: 12px 15px; border: 1.5px solid rgba(138, 43, 226, 0.3); border-radius: 8px; background: rgba(30, 30, 60, 0.5); color: white; font-size: 14px; box-sizing: border-box; transition: all 0.3s ease;") }}
+				{% if form.email.errors %}
+					<div style="color: #ef4444; font-size: 12px; margin-top: 5px;">{{ form.email.errors[0] }}</div>
+				{% endif %}
+			</div>
+
+			<div style="margin-bottom: 30px;">
+				<label for="message" style="display: block; margin-bottom: 8px; font-weight: 600; color: #00d4ff;">✨ Your Message</label>
+				{{ form.message(class="contact-input", rows="8", placeholder="Tell us your thoughts, ideas, or collaboration proposals...", style="width: 100%; padding: 12px 15px; border: 1.5px solid rgba(138, 43, 226, 0.3); border-radius: 8px; background: rgba(30, 30, 60, 0.5); color: white; font-size: 14px; box-sizing: border-box; font-family: inherit; resize: vertical; transition: all 0.3s ease; min-height: 150px;") }}
+				{% if form.message.errors %}
+					<div style="color: #ef4444; font-size: 12px; margin-top: 5px;">{{ form.message.errors[0] }}</div>
+				{% endif %}
+				<small style="color: #888; font-size: 12px; margin-top: 5px; display: block;">Min 10, Max 5000 characters</small>
+			</div>
+
+			<button type="submit" style="padding: 14px; background: linear-gradient(135deg, #8a2be2 0%, #00d4ff 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4);">📤 Send Message</button>
+		</form>
+
+		<div style="text-align: center; margin-top: 30px; padding-top: 25px; border-top: 1px solid rgba(138, 43, 226, 0.2);">
+			<p style="color: #999; font-size: 13px; margin: 0;">
+				💬 WhatsApp: <a href="tel:+2347032205608" style="color: #00d4ff; text-decoration: none;">+234-703-220-5608</a>
+			</p>
+			<p style="color: #999; font-size: 13px; margin: 8px 0 0 0;">
+				📧 Email: <a href="mailto:gchibueze96@gmail.com" style="color: #00d4ff; text-decoration: none;">gchibueze96@gmail.com</a>
+			</p>
+		</div>
+	</div>
+</section>
+
+<style>
+	.contact-input:focus {
+		outline: none;
+		border-color: #00d4ff !important;
+		box-shadow: 0 0 20px rgba(0, 212, 255, 0.5) !important;
+		background: rgba(30, 30, 60, 0.8) !important;
+	}
+
+	.contact-input::placeholder {
+		color: rgba(150, 150, 200, 0.5);
+	}
+</style>
+{% endblock %}

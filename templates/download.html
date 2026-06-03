@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Download - Goodchi experience{% endblock %}
+
+{% block content %}
+<section>
+	<h2>Downloads</h2>
+	<p>Welcome{% if current_user.is_authenticated %}, {{ current_user.username }}{% endif %}! Select the Genesis EP track you want to download (authenticated users only).</p>
+	<ul>
+		<li><a href="audio file/Goodchi_247P n B_Prod by JoeBagZ (1).mp3">247pnb (MP3)</a></li>
+		<li><a href="audio file/Goodchi_Sticks n Bones (Version 1) _Prod JoeBagZ (1).mp3">Sticks n Bones (MP3)</a></li>
+		<li><a href="audio file/Goodchi- Say your mine.wav">Say Your Mine (MP3)</a></li>
+		<li><a href="audio file/Goodchi-Girls like you.wav">Girls like you (MP3)</a></li>
+		<li><a href="audio file/Goodchi- Dollars.wav">Dollars (MP3)</a></li>
+	</ul>
+	<p>More tracks will be available soon as we expand the catalogue.</p>
+</section>
+{% endblock %}

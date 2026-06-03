@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Create New Post - Goodchi experience{% endblock %}
+
+{% block content %}
+<article class="post featured">
+	<header class="major">
+		<h2>✨ Create New Post</h2>
+	</header>
+
+	<form method="POST" action="{{ url_for('admin_new_post') }}" style="max-width: 100%;">
+		<div style="margin-bottom: 20px;">
+			<label for="slug" style="display: block; margin-bottom: 8px; font-weight: bold;">Slug *</label>
+			<input type="text" name="slug" id="slug" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="e.g., my-awesome-post">
+			<small style="display: block; margin-top: 5px; color: #666;">URL-friendly identifier (lowercase, hyphens only, no spaces)</small>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="title" style="display: block; margin-bottom: 8px; font-weight: bold;">Title *</label>
+			<input type="text" name="title" id="title" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="Post title">
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="excerpt" style="display: block; margin-bottom: 8px; font-weight: bold;">Excerpt *</label>
+			<textarea name="excerpt" id="excerpt" required rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: Arial, sans-serif;" placeholder="Brief summary for post cards"></textarea>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="content" style="display: block; margin-bottom: 8px; font-weight: bold;">Content * (HTML supported)</label>
+			<textarea name="content" id="content" required rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: monospace;" placeholder="Post content (HTML tags allowed)"></textarea>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="date" style="display: block; margin-bottom: 8px; font-weight: bold;">Date *</label>
+			<input type="text" name="date" id="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="e.g., January 15, 2025">
+			<small style="display: block; margin-top: 5px; color: #666;">Format: Month Day, Year</small>
+		</div>
+
+		<div style="margin-bottom: 20px;">
+			<label for="image" style="display: block; margin-bottom: 8px; font-weight: bold;">Image Path *</label>
+			<input type="text" name="image" id="image" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" placeholder="e.g., images/my-image.jpeg">
+			<small style="display: block; margin-top: 5px; color: #666;">Path relative to static folder (e.g., images/photo.jpg)</small>
+		</div>
+
+		<div style="margin-top: 30px; display: flex; gap: 10px;">
+			<button type="submit" class="button primary">✅ Create Post</button>
+			<a href="{{ url_for('admin_posts') }}" class="button">Cancel</a>
+		</div>
+	</form>
+</article>
+{% endblock %}

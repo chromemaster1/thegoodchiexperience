@@ -1,0 +1,69 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+	<!-- Intro -->
+	<div id="intro">
+	<h1>This is the Goodchi experience </h1><br />
+	<p>A fun way for me to showcase my adventures and versatile art piece, both musical and software. having fun while building useful software tools for creators and entreprenuers.</p>
+	<p>Probably add a visual road map so you can see all our favourite stops or mixes. "loves n kisses</p>
+	<p>for business inquiries and collaborations send a mail <a href="mailto:gchibueze96@gmail.com">here</a> </p>
+	<p>follow and support the movement on social media; x and ig <a href="https://x.com/iam_ggmusic"> @iam_ggmusic </a>, <a href="https://instagram.com/Goodchi_thesound">@Goodchi_thesound</a></p>
+	</div>
+
+<!-- Featured Post -->
+	{% if posts and pagination.page == 1 %}
+	<article class="post featured">
+		<div class="post-content">
+			<span class="date">{{ posts[0].date }}</span>
+			<h2><a href="{{ url_for('post', slug=posts[0].slug) }}">{{ posts[0].title }}</a></h2>
+		</div>
+		<a href="{{ url_for('post', slug=posts[0].slug) }}" class="image main"><img src="{{ url_for('static', filename=posts[0].image) }}" alt="{{ posts[0].title }}" /></a>
+		<p>{{ posts[0].excerpt }}</p>
+		<ul class="actions special">
+			<li><a href="{{ url_for('post', slug=posts[0].slug) }}" class="button large">Full Story</a></li>
+		</ul>
+	</article>
+	{% endif %}
+
+<!-- Posts -->
+	<section class="posts">
+		{% set post_list = posts[1:] if pagination.page == 1 and posts else posts %}
+		{% for post in post_list %}
+		<article>
+			<div class="post-content">
+				<span class="date">{{ post.date }}</span>
+				<h2><a href="{{ url_for('post', slug=post.slug) }}">{{ post.title }}</a></h2>
+			</div>
+			<a href="{{ url_for('post', slug=post.slug) }}" class="image fit"><img src="{{ url_for('static', filename=post.image) }}" alt="{{ post.title }}" /></a>
+			<p>{{ post.excerpt }}</p>
+			<ul class="actions special">
+				<li><a href="{{ url_for('post', slug=post.slug) }}" class="button">Full Story</a></li>
+			</ul>
+		</article>
+		{% endfor %}
+	</section>
+
+	<!-- Footer -->
+	<footer>
+		<div class="pagination">
+			{% if pagination.has_prev %}
+			<a href="{{ url_for('home', page=pagination.prev_num) }}" class="previous">Prev</a>
+			{% endif %}
+			{% for page_num in pagination.iter_pages(left_edge=1, left_current=2, right_current=3, right_edge=1) %}
+			{% if page_num %}
+			{% if pagination.page == page_num %}
+			<a href="{{ url_for('home', page=page_num) }}" class="page active">{{ page_num }}</a>
+			{% else %}
+			<a href="{{ url_for('home', page=page_num) }}" class="page">{{ page_num }}</a>
+			{% endif %}
+			{% else %}
+			<span class="extra">&hellip;</span>
+			{% endif %}
+			{% endfor %}
+			{% if pagination.has_next %}
+			<a href="{{ url_for('home', page=pagination.next_num) }}" class="next">Next</a>
+			{% endif %}
+		</div>
+	</footer>
+{% endblock %}
