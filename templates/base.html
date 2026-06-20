@@ -1,100 +1,203 @@
 <!DOCTYPE HTML>
-<html>
-	<head>
-		<title>{% block title %}Goodchi experience{% endblock %}</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="{{ url_for('static', filename='assets/css/styles.css') }}" />
-		<noscript><link rel="stylesheet" href="{{ url_for('static', filename='assets/css/noscript.css') }}" /></noscript>
-	</head>
-	<body class="is-preload">
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Goodchi Experience{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/styles.css') }}" />
+</head>
+<body>
 
-		<!-- Wrapper -->
-		<div id="wrapper" class="fade-in">
+<!-- Cosmic star-field background -->
+<canvas id="starfield"></canvas>
 
-			<!-- Header -->
-			<header id="header">
-				<a href="{{ url_for('home') }}" class="logo">
-					<img src="{{ url_for('static', filename='images/download (12).png') }}" alt="Goodchi Logo" style="height: 50px; width: auto; object-fit: contain;">
-				</a>
-				<nav>
-					<ul class="links">
-						<li class="{% if request.endpoint == 'home' %}active{% endif %}"><a href="{{ url_for('home') }}">Home</a></li>
-						{% if current_user.is_authenticated %}
-							<li class="{% if request.endpoint == 'download' %}active{% endif %}"><a href="{{ url_for('download') }}">Download</a></li>
-							<li class="{% if request.endpoint == 'contact' %}active{% endif %}"><a href="{{ url_for('contact') }}">Contact</a></li>
-							{% if current_user.is_admin %}
-								<li class="{% if request.endpoint == 'admin_posts' %}active{% endif %}"><a href="{{ url_for('admin_posts') }}" style="color: #ff6b35; font-weight: bold;">⚙️ Admin Panel</a></li>
-							{% endif %}
-						{% endif %}
-						<li class="{% if request.endpoint == 'about' %}active{% endif %}"><a href="{{ url_for('about') }}">About</a></li>
-						{% if current_user.is_authenticated %}
-							<li><span style="color: #999; margin: 0 10px;">|</span></li>
-							<li><span style="font-size: 14px; color: #999;">{{ current_user.username }}</span></li>
-							<li><a href="{{ url_for('logout') }}" style="color: #d32f2f;">Logout</a></li>
-						{% else %}
-							<li><span style="color: #999; margin: 0 10px;">|</span></li>
-							<li><a href="{{ url_for('login') }}">Login</a></li>
-							<li><a href="{{ url_for('register') }}" style="color: #28a745;">Register</a></li>
-						{% endif %}
-					</ul>
-				</nav>
-			</header>
+<div id="wrapper" class="fade-in">
 
-			<!-- Main -->
-			<div id="main">
-				{% block content %}{% endblock %}
-			</div>
+  <!-- ── Header ── -->
+  <header id="header">
+    <a href="{{ url_for('home') }}" class="logo">
+      <img src="{{ url_for('static', filename='images/download (12).png') }}"
+           alt="Goodchi"
+           onerror="this.style.display='none'">
+    </a>
+    <nav>
+      <ul class="links">
+        <li class="{% if request.endpoint == 'home' %}active{% endif %}">
+          <a href="{{ url_for('home') }}">Home</a>
+        </li>
+        {% if current_user.is_authenticated %}
+          <li class="{% if request.endpoint == 'download' %}active{% endif %}">
+            <a href="{{ url_for('download') }}">Downloads</a>
+          </li>
+          <li class="{% if request.endpoint == 'contact' %}active{% endif %}">
+            <a href="{{ url_for('contact') }}">Contact</a>
+          </li>
+          {% if current_user.is_admin %}
+            <li class="{% if 'admin' in request.endpoint %}active{% endif %}">
+              <a href="{{ url_for('admin_dashboard') }}" style="color:var(--gold)">⚙ Admin</a>
+            </li>
+          {% endif %}
+          <li class="{% if request.endpoint == 'notifications' %}active{% endif %}">
+            <a href="{{ url_for('notifications') }}" class="notif-bell-link">
+              🔔
+              {% if unread_notification_count and unread_notification_count > 0 %}
+              <span class="notif-badge">{{ unread_notification_count if unread_notification_count < 100 else '99+' }}</span>
+              {% endif %}
+            </a>
+          </li>
+          <li class="{% if 'settings' in request.endpoint %}active{% endif %}">
+            <a href="{{ url_for('settings') }}">⚙ Settings</a>
+          </li>
+        {% endif %}
+        <li class="{% if request.endpoint == 'about' %}active{% endif %}">
+          <a href="{{ url_for('about') }}">About</a>
+        </li>
+        <li class="{% if request.endpoint == 'support_page' %}active{% endif %}">
+          <a href="{{ url_for('support_page') }}" style="color:var(--gold)">♥ Support</a>
+        </li>
+        {% if current_user.is_authenticated %}
+          <li>
+            <a href="{{ url_for('logout') }}" style="color:#ef4444">Logout</a>
+          </li>
+        {% else %}
+          <li><a href="{{ url_for('login') }}">Login</a></li>
+          <li><a href="{{ url_for('register') }}" style="color:var(--mint)">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
 
-			<hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages" style="padding-top:90px">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
 
-			<!-- Footer -->
-			<footer id="footer">
-				<section class="split contact">
-					<section class="alt">
-						<h3>Address</h3>
-						<p>no10 orji street,Rukpokwu eneka road, kentagon apartment <br />
-						port harcourt, Rivers state</p>
-					</section>
-					<section>
-						<h3>Phone</h3>
-						<p><a href="#">(+234)8028853151</a></p>
-					</section>
-					<section>
-						<h3>whatsapp</h3>
-						<p><a href="#">(+234)7032205608</a></p>
-					</section>
-					<section>
-						<h3>Email</h3>
-						<p><a href="mailto:gchibueze96@gmail.com">gchibueze96@gmail.com</a></p>
-					</section>
-					<section>
-						<h3>Social</h3>
-						<ul class="icons alt">
-							<li><a href="https://x.com/iam_ggmusic" class="icon brands alt fa-twitter"><span class="label">Twitter</span></a></li>
-							<li><a href="https://www.facebook.com/Goodchi fanpage" class="icon brands alt fa-facebook-f"><span class="label">Facebook</span></a></li>
-							<li><a href="https://www.instagram.com/Goodchi_thesound" class="icon brands alt fa-instagram"><span class="label">Instagram</span></a></li>
-							<li><a href="https://github.com/chromemaster1" class="icon brands alt fa-github"><span class="label">GitHub</span></a></li>
-						</ul>
-					</section>
-				</section>
-			</footer>
+  <!-- Main content -->
+  <div id="main">
+    {% block content %}{% endblock %}
+  </div>
 
-			<!-- Copyright -->
-			<div id="copyright">
-				<ul><li>&copy; Goodluck Portfolio site</li><li>Design: <a href="https://html5up.net">HTML5 UP</a></li></ul>
-			</div>
+  <!-- ── Footer ── -->
+  <footer id="footer">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-label">Based in</div>
+        <p>Lagos, Nigeria<br>Port Harcourt, Rivers</p>
+      </div>
+      <div>
+        <div class="footer-label">Phone</div>
+        <p><a href="tel:+2348028853151">+234 802 885 3151</a></p>
+        <p><a href="https://wa.me/2347032205608">+234 703 220 5608</a></p>
+      </div>
+      <div>
+        <div class="footer-label">Email</div>
+        <p><a href="mailto:gchibueze96@gmail.com">gchibueze96@gmail.com</a></p>
+      </div>
+      <div>
+        <div class="footer-label">Follow the movement</div>
+        <div class="social-icons">
+          <a href="https://x.com/iam_ggmusic" title="X / Twitter">𝕏</a>
+          <a href="https://www.instagram.com/Goodchi_thesound" title="Instagram">ig</a>
+          <a href="https://www.facebook.com/Goodchi fanpage" title="Facebook">fb</a>
+          <a href="https://github.com/chromemaster1" title="GitHub">gh</a>
+        </div>
+      </div>
+    </div>
+    <div class="copyright">&copy; {{ 2025 }} Goodchi Experience — All rights reserved</div>
+  </footer>
 
-		</div>
+</div><!-- /wrapper -->
 
-		<!-- Scripts -->
-		<script src="{{ url_for('static', filename='assets/js/jquery.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/jquery.scrollex.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/jquery.scrolly.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/browser.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/breakpoints.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/util.js') }}"></script>
-		<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+<!-- ── Star-field script ── -->
+<script>
+(function() {
+  const canvas = document.getElementById('starfield');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, stars, scroll = 0;
 
-	</body>
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = Array.from({length: 200}, () => ({
+      x:     Math.random() * W,
+      y:     Math.random() * H,
+      r:     Math.random() * 1.5 + 0.2,
+      speed: Math.random() * 0.3 + 0.05,
+      pulse: Math.random() * Math.PI * 2,
+      color: Math.random() > 0.85 ? '#6c63ff' : Math.random() > 0.7 ? '#00f5c4' : '#ffffff',
+      alpha: Math.random() * 0.7 + 0.2,
+    }));
+    // A handful of larger nebula blobs
+    stars.nebulae = Array.from({length: 6}, () => ({
+      x:  Math.random() * W,
+      y:  Math.random() * H,
+      r:  Math.random() * 120 + 60,
+      hue: Math.random() > 0.5 ? '108,99,255' : '0,245,196',
+    }));
+  }
+
+  function draw(ts) {
+    ctx.clearRect(0, 0, W, H);
+
+    // nebula glows
+    stars.nebulae.forEach(n => {
+      const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      grd.addColorStop(0,   `rgba(${n.hue},0.06)`);
+      grd.addColorStop(1,   `rgba(${n.hue},0)`);
+      ctx.beginPath();
+      ctx.arc(n.x, n.y + scroll * 0.02, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    });
+
+    // stars
+    const t = ts * 0.0005;
+    stars.forEach(s => {
+      const a = s.alpha * (0.7 + 0.3 * Math.sin(t * s.speed * 5 + s.pulse));
+      ctx.beginPath();
+      ctx.arc(s.x, (s.y + scroll * s.speed * 0.12) % H, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = s.color.replace(')', `,${a})`).replace('rgb', 'rgba').replace('#ffffff', `rgba(255,255,255,${a})`);
+      // fallback for hex
+      if (s.color.startsWith('#')) {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = s.color;
+      }
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); initStars(); });
+  window.addEventListener('scroll', () => { scroll = window.scrollY; });
+  resize();
+  initStars();
+  requestAnimationFrame(draw);
+})();
+
+// ── Scroll-in orbit animation ──
+const orbitObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('visible'), i * 80);
+      orbitObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.orbit-card').forEach(el => orbitObserver.observe(el));
+</script>
+
+</body>
 </html>

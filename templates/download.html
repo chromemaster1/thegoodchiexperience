@@ -1,18 +1,207 @@
 {% extends "base.html" %}
-
-{% block title %}Download - Goodchi experience{% endblock %}
+{% block title %}Downloads — Goodchi Experience{% endblock %}
 
 {% block content %}
-<section>
-	<h2>Downloads</h2>
-	<p>Welcome{% if current_user.is_authenticated %}, {{ current_user.username }}{% endif %}! Select the Genesis EP track you want to download (authenticated users only).</p>
-	<ul>
-		<li><a href="audio file/Goodchi_247P n B_Prod by JoeBagZ (1).mp3">247pnb (MP3)</a></li>
-		<li><a href="audio file/Goodchi_Sticks n Bones (Version 1) _Prod JoeBagZ (1).mp3">Sticks n Bones (MP3)</a></li>
-		<li><a href="audio file/Goodchi- Say your mine.wav">Say Your Mine (MP3)</a></li>
-		<li><a href="audio file/Goodchi-Girls like you.wav">Girls like you (MP3)</a></li>
-		<li><a href="audio file/Goodchi- Dollars.wav">Dollars (MP3)</a></li>
-	</ul>
-	<p>More tracks will be available soon as we expand the catalogue.</p>
-</section>
+
+<div id="intro" style="padding-bottom:20px">
+  <h1>Downloads</h1>
+  <p>
+    {% if current_user.is_authenticated %}
+      Welcome back, <strong style="color:var(--mint)">{{ current_user.username }}</strong>.
+      Stream or download everything below.
+    {% else %}
+      <a href="{{ url_for('login') }}" style="color:var(--mint)">Sign in</a> to access downloads.
+    {% endif %}
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     GENESIS EP — one grouped hero album card
+     Always shown (hardcoded tracklist lives in the static
+     audio folder; admin-added items appear below).
+══════════════════════════════════════════════════ -->
+<div class="section-label">Genesis EP</div>
+
+<div class="orbit-card album-hero-card" style="margin-bottom:32px">
+
+  <!-- Album header -->
+  <div class="album-hero-header">
+    <div class="album-art-wrap">
+      <img src="{{ url_for('static', filename='images/genesis-art.jpeg') }}"
+           alt="Genesis EP"
+           onerror="this.style.display='none'" />
+    </div>
+    <div class="album-hero-meta">
+      <div class="card-tag" style="margin-bottom:8px">✦ Debut EP</div>
+      <h2 class="album-hero-title">Genesis EP</h2>
+      <div class="album-hero-sub">Goodchi · 2024 · 5 Tracks</div>
+      <p class="album-hero-desc">
+        The debut project that started everything — raw, honest and direct from the soul.
+        Featuring fan favourites <em>247pnb</em>, <em>Sticks n Bones</em> and more.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <a href="{{ url_for('post', slug='genesis-ep-project') }}" class="btn-ghost" style="font-size:13px">
+          📖 Read the story
+        </a>
+        <a href="{{ url_for('support_page') }}" class="btn-support" style="font-size:13px">♥ Support</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tracklist -->
+  <div class="album-tracklist">
+
+    <!-- Track 1 -->
+    <div class="album-track">
+      <div class="track-num-small">01</div>
+      <div class="track-info-small">
+        <div class="track-name-small">247pnb</div>
+        <div class="track-meta-small">Prod. JoeBagZ</div>
+      </div>
+      <div class="track-links">
+        <a href="https://youtu.be/0B7rEblVepM?si=FGa_1tbnFA7Qttb3"
+           target="_blank" rel="noopener" class="track-link-pill watch">▶ Video</a>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('static', filename='audio file/Goodchi_247P n B_Prod by JoeBagZ (1).mp3') }}"
+           class="track-link-pill download" download>↓ Download</a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="track-link-pill login">🔒 Login</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Track 2 -->
+    <div class="album-track">
+      <div class="track-num-small">02</div>
+      <div class="track-info-small">
+        <div class="track-name-small">Sticks n Bones</div>
+        <div class="track-meta-small">Prod. JoeBagZ</div>
+      </div>
+      <div class="track-links">
+        <a href="https://youtube.com/shorts/YOk-jRM5d1s?si=7haab0eX_YDQDCIS"
+           target="_blank" rel="noopener" class="track-link-pill watch">▶ Video</a>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('static', filename='audio file/Goodchi_Sticks n Bones (Version 1) _Prod JoeBagZ (1).mp3') }}"
+           class="track-link-pill download" download>↓ Download</a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="track-link-pill login">🔒 Login</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Track 3 -->
+    <div class="album-track">
+      <div class="track-num-small">03</div>
+      <div class="track-info-small">
+        <div class="track-name-small">Say Your Mine</div>
+        <div class="track-meta-small">Goodchi</div>
+      </div>
+      <div class="track-links">
+        <a href="https://youtube.com/shorts/LjjBiOk_Uts?si=J0QLIZGZxbWNAFC7"
+           target="_blank" rel="noopener" class="track-link-pill watch">▶ Video</a>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('static', filename='audio file/Goodchi- Say your mine.wav') }}"
+           class="track-link-pill download" download>↓ Download</a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="track-link-pill login">🔒 Login</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Track 4 -->
+    <div class="album-track">
+      <div class="track-num-small">04</div>
+      <div class="track-info-small">
+        <div class="track-name-small">Girls Like You</div>
+        <div class="track-meta-small">Goodchi</div>
+      </div>
+      <div class="track-links">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('static', filename='audio file/Goodchi-Girls like you.wav') }}"
+           class="track-link-pill download" download>↓ Download</a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="track-link-pill login">🔒 Login</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Track 5 -->
+    <div class="album-track" style="border-bottom:none">
+      <div class="track-num-small">05</div>
+      <div class="track-info-small">
+        <div class="track-name-small">Dollars</div>
+        <div class="track-meta-small">Goodchi</div>
+      </div>
+      <div class="track-links">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('static', filename='audio file/Goodchi- Dollars.wav') }}"
+           class="track-link-pill download" download>↓ Download</a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="track-link-pill login">🔒 Login</a>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /album-tracklist -->
+</div><!-- /album-hero-card -->
+
+
+<!-- ══════════════════════════════════════════════════
+     ADMIN-ADDED ITEMS  (individual hero cards per track/release)
+     Only shown when the admin has added DB entries.
+══════════════════════════════════════════════════ -->
+{% if download_items %}
+<div class="section-label" style="margin-top:8px">More Releases</div>
+<div class="download-grid">
+  {% for item in download_items %}
+  <div class="orbit-card track-card">
+    <div class="track-number">{{ '%02d'|format(loop.index) }}</div>
+    <div class="track-waveform">🎵</div>
+    <div class="track-info">
+      <div class="track-name">{{ item.title }}</div>
+      <div class="track-meta">
+        {{ item.artist or 'Goodchi' }}
+        {% if item.album %} · {{ item.album }}{% endif %}
+        {% if item.producer %} · Prod. {{ item.producer }}{% endif %}
+      </div>
+      {% if item.description %}
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">{{ item.description }}</div>
+      {% endif %}
+    </div>
+    <div class="track-actions">
+      {% if current_user.is_authenticated %}
+        {% if item.audio_path %}
+        <a href="{{ url_for('static', filename=item.audio_path) }}"
+           class="btn-primary" download>↓ Download</a>
+        {% endif %}
+        {% if item.stream_url %}
+        <a href="{{ item.stream_url }}" target="_blank" rel="noopener" class="btn-ghost">▶ Stream</a>
+        {% endif %}
+      {% else %}
+        <a href="{{ url_for('login') }}" class="btn-ghost">🔒 Login to download</a>
+      {% endif %}
+      <a href="{{ url_for('support_page') }}" class="btn-support">♥ Support</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+<!-- ── Support CTA ── -->
+<div class="orbit-card" style="margin-top:24px;text-align:center;padding:40px 24px">
+  <div class="orbit-card-inner">
+    <p style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;color:var(--text-1);margin-bottom:8px">
+      Enjoyed the music?
+    </p>
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:20px;max-width:480px;margin-left:auto;margin-right:auto">
+      These tracks are free to download. If they moved you, consider supporting the artist
+      — even $1 helps keep the music coming.
+    </p>
+    <a href="{{ url_for('support_page') }}" class="btn-support" style="font-size:14px;padding:12px 28px">
+      ♥ Pay What You Want
+    </a>
+  </div>
+</div>
+
 {% endblock %}

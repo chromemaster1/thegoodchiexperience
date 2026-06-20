@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block title %}Settings — Goodchi Experience{% endblock %}
+
+{% block content %}
+<div class="settings-shell" style="padding-top:90px;max-width:860px;margin:0 auto;padding-bottom:60px">
+
+  <!-- Page header -->
+  <div style="margin-bottom:32px">
+    <h1 style="font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:700;color:var(--text-1);margin-bottom:6px">
+      Account Settings
+    </h1>
+    <p style="font-size:14px;color:var(--text-2)">Manage your profile, security and notification preferences.</p>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages" style="margin-bottom:24px">
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Tab nav -->
+  <div class="settings-tabs">
+    <button class="settings-tab active" onclick="showSettingsTab('profile', this)">👤 Profile</button>
+    <button class="settings-tab" onclick="showSettingsTab('password', this)">🔑 Password</button>
+    <button class="settings-tab" onclick="showSettingsTab('security', this)">🛡 Security &amp; 2FA</button>
+    <button class="settings-tab" onclick="showSettingsTab('notifications', this)">🔔 Notifications</button>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TAB: PROFILE
+  ══════════════════════════════════════ -->
+  <div class="settings-panel" id="sp-profile">
+    <div class="orbit-card" style="padding:32px">
+
+      <!-- Avatar display -->
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:32px">
+        <div class="settings-avatar">
+          {% if current_user.avatar %}
+            <img src="{{ url_for('static', filename=current_user.avatar) }}" alt="Avatar" />
+          {% else %}
+            <span>{{ current_user.username[0].upper() }}</span>
+          {% endif %}
+        </div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text-1)">
+            {{ current_user.username }}
+          </div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:2px">{{ current_user.email }}</div>
+          {% if current_user.is_admin %}
+          <span class="badge badge-admin" style="margin-top:6px;display:inline-block">Admin</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('settings_profile') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="settings-form-row">
+          <div class="settings-field">
+            <label class="settings-label">Username</label>
+            <input type="text" name="username" class="settings-input"
+                   value="{{ current_user.username }}" required
+                   placeholder="Your display name" />
+            <small class="settings-hint">This is how you appear on the site.</small>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label">Email address</label>
+            <input type="email" name="email" class="settings-input"
+                   value="{{ current_user.email }}" required />
+          </div>
+        </div>
+
+        <div class="settings-field" style="margin-top:20px">
+          <label class="settings-label">Bio <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <textarea name="bio" class="settings-input" rows="3"
+                    placeholder="A short bio about yourself...">{{ current_user.bio or '' }}</textarea>
+        </div>
+
+        <div class="settings-field" style="margin-top:20px">
+          <label class="settings-label">Avatar URL <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <input type="text" name="avatar" class="settings-input"
+                 value="{{ current_user.avatar or '' }}"
+                 placeholder="images/your-photo.jpg or https://..." />
+          <small class="settings-hint">Path relative to static folder, or a full https:// URL.</small>
+        </div>
+
+        <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
+          <button type="submit" class="btn-primary">Save Profile</button>
+          <a href="{{ url_for('home') }}" class="btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TAB: PASSWORD
+  ══════════════════════════════════════ -->
+  <div class="settings-panel" id="sp-password" style="display:none">
+    <div class="orbit-card" style="padding:32px">
+
+      <h2 class="settings-section-title">Change Password</h2>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:28px">
+        Use a strong password you don't use anywhere else.
+      </p>
+
+      <form method="POST" action="{{ url_for('settings_password') }}" id="pwForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="settings-field">
+          <label class="settings-label">Current password</label>
+          <div class="pw-wrapper">
+            <input type="password" name="current_password" id="pw_current" class="settings-input" required
+                   placeholder="Enter your current password" />
+            <button type="button" class="pw-toggle" onclick="togglePw('pw_current', this)">Show</button>
+          </div>
+        </div>
+
+        <div class="settings-field" style="margin-top:20px">
+          <label class="settings-label">New password</label>
+          <div class="pw-wrapper">
+            <input type="password" name="new_password" id="pw_new" class="settings-input" required
+                   placeholder="At least 8 characters"
+                   oninput="checkStrength(this.value)" />
+            <button type="button" class="pw-toggle" onclick="togglePw('pw_new', this)">Show</button>
+          </div>
+          <!-- Strength meter -->
+          <div class="pw-strength-bar" id="pwBar"><div id="pwFill"></div></div>
+          <small id="pwLabel" class="settings-hint" style="margin-top:4px">—</small>
+        </div>
+
+        <div class="settings-field" style="margin-top:20px">
+          <label class="settings-label">Confirm new password</label>
+          <div class="pw-wrapper">
+            <input type="password" name="confirm_password" id="pw_confirm" class="settings-input" required
+                   placeholder="Repeat new password" />
+            <button type="button" class="pw-toggle" onclick="togglePw('pw_confirm', this)">Show</button>
+          </div>
+          <small id="pwMatch" class="settings-hint"></small>
+        </div>
+
+        <div style="margin-top:28px">
+          <button type="submit" class="btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TAB: SECURITY & 2FA
+  ══════════════════════════════════════ -->
+  <div class="settings-panel" id="sp-security" style="display:none">
+
+    <!-- 2FA card -->
+    <div class="orbit-card" style="padding:32px;margin-bottom:20px">
+      <h2 class="settings-section-title">Two-Factor Authentication (2FA)</h2>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:24px">
+        Add an extra layer of protection. Each login will require a 6-digit code from your authenticator app
+        (Google Authenticator, Authy, etc.).
+      </p>
+
+      {% if current_user.totp_enabled %}
+        <!-- 2FA already on -->
+        <div class="security-status on">
+          <span class="security-dot"></span>
+          <strong>2FA is active</strong> — your account is protected.
+        </div>
+        <form method="POST" action="{{ url_for('settings_disable_2fa') }}" style="margin-top:20px"
+              onsubmit="return confirm('Disable 2FA? Your account will be less secure.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-sm danger" style="padding:10px 20px">Disable 2FA</button>
+        </form>
+
+      {% elif show_qr %}
+        <!-- Setup mode: show QR -->
+        <div class="twofa-setup">
+          <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+            1. Scan this QR code with your authenticator app.<br>
+            2. Enter the 6-digit code it shows to confirm.
+          </p>
+          <div class="twofa-qr-wrap">
+            <img src="{{ qr_image }}" alt="2FA QR Code" style="width:200px;height:200px;border-radius:8px;background:#fff;padding:8px" />
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin:12px 0">
+            Can't scan? Enter this key manually:<br>
+            <code style="font-size:13px;letter-spacing:2px;color:var(--mint)">{{ totp_secret }}</code>
+          </p>
+          <form method="POST" action="{{ url_for('settings_verify_2fa') }}" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="totp_code" class="settings-input" maxlength="6" inputmode="numeric"
+                   placeholder="123456" style="max-width:160px;letter-spacing:4px;text-align:center" required />
+            <button type="submit" class="btn-primary">Verify &amp; Activate</button>
+          </form>
+        </div>
+
+      {% else %}
+        <!-- 2FA off -->
+        <div class="security-status off">
+          <span class="security-dot"></span>
+          <strong>2FA is not enabled.</strong> We recommend turning it on.
+        </div>
+        <form method="POST" action="{{ url_for('settings_enable_2fa') }}" style="margin-top:20px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-primary">Enable 2FA</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <!-- Active sessions / login history -->
+    <div class="orbit-card" style="padding:32px">
+      <h2 class="settings-section-title">Recent Login Activity</h2>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:20px">
+        Last recorded login sessions for your account.
+      </p>
+      {% if login_history %}
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Date &amp; Time</th><th>IP Address</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for entry in login_history %}
+            <tr>
+              <td style="font-size:12px;color:var(--text-2)">{{ entry.timestamp.strftime('%d %b %Y, %H:%M') }}</td>
+              <td class="mono" style="font-size:12px">{{ entry.ip_address or '—' }}</td>
+              <td><span class="badge {{ 'badge-active' if entry.success else 'badge-off' }}">{{ 'Success' if entry.success else 'Failed' }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:var(--text-3)">No login history recorded yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TAB: NOTIFICATIONS
+  ══════════════════════════════════════ -->
+  <div class="settings-panel" id="sp-notifications" style="display:none">
+    <div class="orbit-card" style="padding:32px;margin-bottom:20px">
+      <h2 class="settings-section-title">Notification Preferences</h2>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:24px">
+        Choose which updates you want to receive.
+      </p>
+
+      <form method="POST" action="{{ url_for('settings_notifications') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="notif-pref-list">
+
+          <div class="notif-pref-row">
+            <div>
+              <div class="notif-pref-label">New posts &amp; stories</div>
+              <div class="notif-pref-sub">Get notified when a new blog post or story is published.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="notif_new_posts"
+                     {{ 'checked' if current_user.notif_new_posts else '' }}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="notif-pref-row">
+            <div>
+              <div class="notif-pref-label">New music releases</div>
+              <div class="notif-pref-sub">Get notified when new tracks are added to Downloads.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="notif_new_music"
+                     {{ 'checked' if current_user.notif_new_music else '' }}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="notif-pref-row">
+            <div>
+              <div class="notif-pref-label">Site announcements</div>
+              <div class="notif-pref-sub">Important updates, feature launches, and events.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="notif_announcements"
+                     {{ 'checked' if current_user.notif_announcements else '' }}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="notif-pref-row">
+            <div>
+              <div class="notif-pref-label">Email notifications</div>
+              <div class="notif-pref-sub">Receive the above via email as well as in-app.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="notif_email"
+                     {{ 'checked' if current_user.notif_email else '' }}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+        </div>
+
+        <div style="margin-top:28px">
+          <button type="submit" class="btn-primary">Save Preferences</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Notification inbox -->
+    <div class="orbit-card" style="padding:32px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <h2 class="settings-section-title" style="margin:0">Notification Inbox</h2>
+        {% if notifications %}
+        <form method="POST" action="{{ url_for('notifications_clear') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-sm">Clear all</button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if notifications %}
+      <div class="notif-inbox">
+        {% for n in notifications %}
+        <div class="notif-inbox-item {{ 'unread' if not n.read else '' }}">
+          <div class="notif-inbox-icon">
+            {% if n.type == 'new_post' %}📝
+            {% elif n.type == 'new_music' %}🎵
+            {% elif n.type == 'announcement' %}📣
+            {% else %}🔔{% endif %}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="notif-inbox-title">{{ n.title }}</div>
+            <div class="notif-inbox-body">{{ n.message }}</div>
+            <div class="notif-inbox-time">{{ n.created_at.strftime('%d %b %Y, %H:%M') }}</div>
+          </div>
+          {% if n.link %}
+          <a href="{{ n.link }}" class="btn-sm">View →</a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:var(--text-3);text-align:center;padding:32px 0">
+        No notifications yet. You're all caught up!
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /settings-shell -->
+
+<!-- ── Settings JS ── -->
+<script>
+function showSettingsTab(name, btn) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById('sp-' + name);
+  if (panel) panel.style.display = 'block';
+  if (btn)  btn.classList.add('active');
+}
+
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  if (!inp) return;
+  const hidden = inp.type === 'password';
+  inp.type = hidden ? 'text' : 'password';
+  btn.textContent = hidden ? 'Hide' : 'Show';
+}
+
+function checkStrength(val) {
+  const fill  = document.getElementById('pwFill');
+  const label = document.getElementById('pwLabel');
+  if (!fill) return;
+  let score = 0;
+  if (val.length >= 8)  score++;
+  if (val.length >= 12) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const pct   = (score / 5) * 100;
+  const color = score <= 1 ? '#ef4444' : score <= 2 ? '#f59e0b' : score <= 3 ? '#3b82f6' : '#10b981';
+  fill.style.width = pct + '%';
+  fill.style.background = color;
+  const labels = ['', 'Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  label.textContent = labels[score] || '—';
+  label.style.color = color;
+}
+
+// Confirm passwords match
+(function() {
+  const nw = document.getElementById('pw_new');
+  const cf = document.getElementById('pw_confirm');
+  const lbl = document.getElementById('pwMatch');
+  if (!nw || !cf) return;
+  function check() {
+    if (!cf.value) { lbl.textContent = ''; return; }
+    if (nw.value === cf.value) {
+      lbl.textContent = '✓ Passwords match';
+      lbl.style.color = '#10b981';
+    } else {
+      lbl.textContent = '✗ Passwords do not match';
+      lbl.style.color = '#ef4444';
+    }
+  }
+  nw.addEventListener('input', check);
+  cf.addEventListener('input', check);
+})();
+
+// Open tab from URL hash
+(function() {
+  const hash = window.location.hash.replace('#', '');
+  const valid = ['profile', 'password', 'security', 'notifications'];
+  if (valid.includes(hash)) {
+    const btn = document.querySelector(`.settings-tab[onclick*="'${hash}'"]`);
+    showSettingsTab(hash, btn);
+  }
+})();
+</script>
+{% endblock %}

@@ -12,9 +12,15 @@ from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
-from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from email_validator import validate_email, EmailNotValidError
+import secrets as _secrets
+import pyotp
+import qrcode
+import io
+import base64
+
+
 
 load_dotenv()
 
@@ -44,8 +50,8 @@ app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['ADMIN_EMAIL'] = os.getenv('ADMIN_EMAIL', 'admin@thegoodchiexperience.com')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', app.config.get('MAIL_USERNAME'))
 
-# Session configuration - add timeout
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+# # Session configuration - add timeout
+# app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')  # True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -57,14 +63,7 @@ csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-login_manager.login_message = 'Please log in to access this page.'
-
-# Rate limiter for security
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
+login_manager.login_message = 'Warning.'
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -75,6 +74,17 @@ class User(UserMixin, db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)
     last_login = db.Column(db.DateTime, nullable=True)
+    bio             = db.Column(db.Text,    nullable=True)
+    avatar          = db.Column(db.String(256), nullable=True)
+    notif_new_posts     = db.Column(db.Boolean, default=True)
+    notif_new_music     = db.Column(db.Boolean, default=True)
+    notif_announcements = db.Column(db.Boolean, default=True)
+    notif_email         = db.Column(db.Boolean, default=False)
+    totp_secret     = db.Column(db.String(32), nullable=True)
+    totp_enabled    = db.Column(db.Boolean, default=False)
+    totp_pending    = db.Column(db.String(32), nullable=True)   # secret shown during setup
+    notifications   = db.relationship('Notification', backref='user', lazy=True, cascade='all,delete')
+    login_history   = db.relationship('LoginHistory',  backref='user', lazy=True, cascade='all,delete')
 
     def set_password(self, password):
         """Hash password with strict requirements"""
@@ -119,6 +129,89 @@ class Post(db.Model):
     def __repr__(self):
         return f'<Post {self.title}>'
 
+class DownloadItem(db.Model):
+    __tablename__ = 'download_item'
+    id             = db.Column(db.Integer,  primary_key=True)
+    title          = db.Column(db.String(200), nullable=False)
+    artist         = db.Column(db.String(200), nullable=True)
+    album          = db.Column(db.String(200), nullable=True)
+    producer       = db.Column(db.String(200), nullable=True)
+    description    = db.Column(db.Text,       nullable=True)
+    audio_path     = db.Column(db.String(512), nullable=False)   # relative to static/
+    stream_url     = db.Column(db.String(512), nullable=True)
+    sort_order     = db.Column(db.Integer, default=0)
+    requires_login = db.Column(db.Boolean, default=True)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Notification(db.Model):
+    __tablename__ = 'notification'
+    id         = db.Column(db.Integer,  primary_key=True)
+    user_id    = db.Column(db.Integer,  db.ForeignKey('user.id'), nullable=False)
+    type       = db.Column(db.String(50),  default='announcement')   # new_post | new_music | announcement
+    title      = db.Column(db.String(200), nullable=False)
+    message    = db.Column(db.Text,        nullable=False)
+    link       = db.Column(db.String(512), nullable=True)
+    read       = db.Column(db.Boolean,     default=False)
+    created_at = db.Column(db.DateTime,    default=datetime.utcnow)
+
+class BroadcastLog(db.Model):
+    __tablename__ = 'broadcast_log'
+    id              = db.Column(db.Integer, primary_key=True)
+    notif_type      = db.Column(db.String(50))
+    title           = db.Column(db.String(200))
+    message         = db.Column(db.Text)
+    link            = db.Column(db.String(512), nullable=True)
+    recipient_count = db.Column(db.Integer, default=0)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+class LoginHistory(db.Model):
+    __tablename__ = 'login_history'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True)
+    success    = db.Column(db.Boolean, default=True)
+    timestamp  = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SupportPayment(db.Model):
+    """Tracks every 'pay what you want' support payment."""
+    __tablename__ = 'support_payment'
+    id             = db.Column(db.Integer, primary_key=True)
+    user_id        = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    supporter_name = db.Column(db.String(120), nullable=True)
+    email          = db.Column(db.String(120), nullable=True)
+    amount         = db.Column(db.Float, nullable=False)
+    method         = db.Column(db.String(20), nullable=False, default='card')  # card|crypto|bank
+    reference      = db.Column(db.String(64), nullable=True, unique=True)
+    stripe_pi_id   = db.Column(db.String(120), nullable=True)
+    status         = db.Column(db.String(20), nullable=False, default='pending')  # pending|completed|failed
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    user           = db.relationship('User', backref='payments', lazy=True)
+
+
+class BankDetail(db.Model):
+    """Bank accounts for the Support page — admin-managed, no code change needed."""
+    __tablename__ = 'bank_detail'
+    id             = db.Column(db.Integer, primary_key=True)
+    bank_name      = db.Column(db.String(120), nullable=False)
+    account_name   = db.Column(db.String(120), nullable=False)
+    account_number = db.Column(db.String(40),  nullable=False)
+    sort_code      = db.Column(db.String(40),  nullable=True)
+    iban           = db.Column(db.String(80),  nullable=True)
+    swift          = db.Column(db.String(20),  nullable=True)
+    country        = db.Column(db.String(60),  nullable=True)
+    is_active      = db.Column(db.Boolean, default=True)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CryptoWallet(db.Model):
+    """Crypto wallet addresses for the Support page — admin-managed."""
+    __tablename__ = 'crypto_wallet'
+    id         = db.Column(db.Integer, primary_key=True)
+    label      = db.Column(db.String(80),  nullable=False)   # e.g. "Bitcoin (BTC)"
+    network    = db.Column(db.String(80),  nullable=True)    # e.g. "Bitcoin Mainnet"
+    address    = db.Column(db.String(200), nullable=False)
+    is_active  = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # WTForms for validation and CSRF protection
 class RegistrationForm(FlaskForm):
@@ -184,6 +277,13 @@ class ContactForm(FlaskForm):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+@app.context_processor
+def inject_notif_count():
+    count = 0
+    if current_user.is_authenticated:
+        count = Notification.query.filter_by(user_id=current_user.id, read=False).count()
+    return dict(unread_notification_count=count)
+
 def admin_required(f):
     """Decorator to require admin privileges"""
     @wraps(f)
@@ -197,6 +297,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 def send_contact_notification(contact_message):
     """Send email notification to admin about new contact message"""
     try:
@@ -204,21 +305,21 @@ def send_contact_notification(contact_message):
             subject=f'New Contact Form Submission from {contact_message.name}',
             recipients=[app.config['ADMIN_EMAIL']],
             body=f"""
-New message from: {contact_message.name}
-Email: {contact_message.email}
-Date: {contact_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+                New message from: {contact_message.name}
+                Email: {contact_message.email}
+                Date: {contact_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}
 
-Message:
-{contact_message.message}
-            """,
-            html=f"""
-<h2>New Contact Form Submission</h2>
-<p><strong>From:</strong> {contact_message.name}</p>
-<p><strong>Email:</strong> <a href="mailto:{contact_message.email}">{contact_message.email}</a></p>
-<p><strong>Date:</strong> {contact_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
-<hr>
-<h3>Message:</h3>
-<p>{contact_message.message.replace(chr(10), '<br>')}</p>
+                Message:
+                {contact_message.message}
+                            """,
+                            html=f"""
+                <h2>New Contact Form Submission</h2>
+                <p><strong>From:</strong> {contact_message.name}</p>
+                <p><strong>Email:</strong> <a href="mailto:{contact_message.email}">{contact_message.email}</a></p>
+                <p><strong>Date:</strong> {contact_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <hr>
+                <h3>Message:</h3>
+                <p>{contact_message.message.replace(chr(10), '<br>')}</p>
             """
         )
         mail.send(msg)
@@ -253,9 +354,8 @@ def register():
     return render_template('register.html', form=form)
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")  # Rate limiting: 5 attempts per minute
 def login():
-    """Handle user login with rate limiting"""
+    """Handle user login with form validation and feedback"""
     if current_user.is_authenticated:
         return redirect(url_for('home'))
 
@@ -264,15 +364,44 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
 
         if user and user.check_password(form.password.data):
+            history = LoginHistory(
+                user_id    = user.id,
+                ip_address = request.remote_addr,
+                success    = True
+            )
+            db.session.add(history)
+            db.session.commit()
+
+            # If 2FA is enabled, redirect to 2FA verify step instead of logging in fully
+            if user.totp_enabled:
+                session['totp_user_id'] = user.id          # temporary — not fully logged in yet
+                return redirect(url_for('verify_2fa_login'))
             login_user(user)
-            user.update_last_login()  # Track last login
-            next_page = request.args.get('next')
+            user.update_last_login()
             flash(f'✅ Welcome back, {user.username}!', 'success')
-            return redirect(next_page) if next_page else redirect(url_for('home'))
+            return redirect(url_for('home'))
         else:
             flash('❌ Invalid username or password.', 'danger')
 
     return render_template('login.html', form=form)
+
+# ── 2FA login step ────────────────────────────────────────────
+@app.route('/verify-2fa', methods=['GET', 'POST'])
+def verify_2fa_login():
+    user_id = session.get('totp_user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+    user = User.query.get_or_404(user_id)
+    error = None
+    if request.method == 'POST':
+        code = request.form.get('totp_code', '').strip()
+        totp = pyotp.TOTP(user.totp_secret)
+        if totp.verify(code, valid_window=1):
+            session.pop('totp_user_id', None)
+            login_user(user)
+            return redirect(url_for('home'))
+        error = 'Invalid code — try again.'
+    return render_template('verify_2fa.html', error=error)
 
 @app.route('/logout')
 @login_required
@@ -285,12 +414,16 @@ def logout():
 @login_required  # PROTECTED: Users must log in to access home page
 def home():
     """Home page - showcasing all posts (login required)"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 4
-    pagination = Post.query.order_by(Post.id.asc()).paginate(page=page, per_page=per_page, error_out=False)
-    posts = pagination.items
-    return render_template("index.html", posts=posts, pagination=pagination)
-
+    page  = request.args.get('page', 1, type=int)
+    posts = Post.query.order_by(Post.id.desc()).paginate(page=page, per_page=6)
+    unread = 0
+    if current_user.is_authenticated:
+        unread = Notification.query.filter_by(user_id=current_user.id, read=False).count()
+    return render_template('index.html',
+        posts               = posts.items,
+        pagination          = posts,
+        unread_notifications= unread,
+    )
 @app.route('/post/<slug>')
 @login_required  # PROTECTED: User must be logged in to view posts
 def post(slug):
@@ -347,7 +480,8 @@ def post(slug):
 @app.route('/download')
 @login_required
 def download():
-    return render_template("download.html")
+    items = DownloadItem.query.order_by(DownloadItem.sort_order, DownloadItem.created_at).all()
+    return render_template('download.html', download_items=items)
 
 @app.route('/contact', methods=['GET', 'POST'])
 @login_required
@@ -381,23 +515,316 @@ def about():
     """About page"""
     return render_template("about.html")
 
-@app.route('/debug')
+# ── Settings: main page (redirects to profile tab) ────────────
+@app.route('/settings')
 @login_required
-def debug():
-    """Debug endpoint - shows user information (remove in production)"""
-    if not current_user.is_admin:
-        flash('❌ Access denied.', 'danger')
-        return redirect(url_for('home'))
+def settings():
+    return redirect(url_for('settings_profile'))
 
-    return f"""
-    <h1>Debug Info</h1>
-    <p><strong>Username:</strong> {current_user.username}</p>
-    <p><strong>Email:</strong> {current_user.email}</p>
-    <p><strong>Is Admin:</strong> {current_user.is_admin}</p>
-    <p><strong>Is Authenticated:</strong> {current_user.is_authenticated}</p>
-    <p><strong>Last Login:</strong> {current_user.last_login}</p>
-    <a href="{url_for('home')}">Back to Home</a>
-    """
+
+@app.route('/settings/profile', methods=['GET', 'POST'])
+@login_required
+def settings_profile():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email    = request.form.get('email', '').strip()
+        bio      = request.form.get('bio', '').strip()
+        avatar   = request.form.get('avatar', '').strip()
+
+        # Check uniqueness (excluding self)
+        if username != current_user.username:
+            if User.query.filter_by(username=username).first():
+                flash('Username already taken.', 'error')
+                return redirect(url_for('settings_profile') + '#profile')
+        if email != current_user.email:
+            if User.query.filter_by(email=email).first():
+                flash('Email already in use.', 'error')
+                return redirect(url_for('settings_profile') + '#profile')
+
+        current_user.username = username
+        current_user.email    = email
+        current_user.bio      = bio
+        current_user.avatar   = avatar or None
+        db.session.commit()
+        flash('Profile updated successfully.', 'success')
+        return redirect(url_for('settings_profile') + '#profile')
+
+    notifications = Notification.query.filter_by(user_id=current_user.id)\
+                                      .order_by(Notification.created_at.desc()).limit(20).all()
+    login_history  = LoginHistory.query.filter_by(user_id=current_user.id)\
+                                       .order_by(LoginHistory.timestamp.desc()).limit(10).all()
+    unread         = Notification.query.filter_by(user_id=current_user.id, read=False).count()
+    show_qr        = False
+    qr_image       = None
+    totp_secret    = None
+
+    return render_template('settings.html',
+        notifications       = notifications,
+        login_history       = login_history,
+        unread_notifications= unread,
+        show_qr             = show_qr,
+        qr_image            = qr_image,
+        totp_secret         = totp_secret,
+    )
+
+
+@app.route('/settings/password', methods=['POST'])
+@login_required
+def settings_password():
+    current_pw  = request.form.get('current_password', '')
+    new_pw      = request.form.get('new_password', '')
+    confirm_pw  = request.form.get('confirm_password', '')
+
+    if not current_user.check_password(current_pw):
+        flash('Current password is incorrect.', 'error')
+        return redirect(url_for('settings_profile') + '#password')
+    if new_pw != confirm_pw:
+        flash('New passwords do not match.', 'error')
+        return redirect(url_for('settings_profile') + '#password')
+    if len(new_pw) < 8:
+        flash('Password must be at least 8 characters.', 'error')
+        return redirect(url_for('settings_profile') + '#password')
+
+    current_user.set_password(new_pw)
+    db.session.commit()
+    flash('Password updated successfully.', 'success')
+    return redirect(url_for('settings_profile') + '#password')
+
+
+@app.route('/settings/notifications', methods=['POST'])
+@login_required
+def settings_notifications():
+    current_user.notif_new_posts     = 'notif_new_posts'     in request.form
+    current_user.notif_new_music     = 'notif_new_music'     in request.form
+    current_user.notif_announcements = 'notif_announcements' in request.form
+    current_user.notif_email         = 'notif_email'         in request.form
+    db.session.commit()
+    flash('Notification preferences saved.', 'success')
+    return redirect(url_for('settings_profile') + '#notifications')
+
+
+# ── 2FA Setup ─────────────────────────────────────────────────
+@app.route('/settings/enable-2fa', methods=['POST'])
+@login_required
+def settings_enable_2fa():
+    secret = pyotp.random_base32()
+    current_user.totp_pending = secret
+    db.session.commit()
+
+    totp     = pyotp.TOTP(secret)
+    otp_uri  = totp.provisioning_uri(name=current_user.email, issuer_name='Goodchi Experience')
+    img      = qrcode.make(otp_uri)
+    buf      = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64   = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+
+    notifications = Notification.query.filter_by(user_id=current_user.id)\
+                                      .order_by(Notification.created_at.desc()).limit(20).all()
+    login_history  = LoginHistory.query.filter_by(user_id=current_user.id)\
+                                       .order_by(LoginHistory.timestamp.desc()).limit(10).all()
+    unread         = Notification.query.filter_by(user_id=current_user.id, read=False).count()
+
+    return render_template('settings.html',
+        notifications       = notifications,
+        login_history       = login_history,
+        unread_notifications= unread,
+        show_qr             = True,
+        qr_image            = qr_b64,
+        totp_secret         = secret,
+    )
+
+
+@app.route('/settings/verify-2fa', methods=['POST'])
+@login_required
+def settings_verify_2fa():
+    code   = request.form.get('totp_code', '').strip()
+    secret = current_user.totp_pending
+    if not secret:
+        flash('No pending 2FA setup.', 'error')
+        return redirect(url_for('settings_profile') + '#security')
+    totp = pyotp.TOTP(secret)
+    if totp.verify(code, valid_window=1):
+        current_user.totp_secret  = secret
+        current_user.totp_pending = None
+        current_user.totp_enabled = True
+        db.session.commit()
+        flash('Two-factor authentication is now active.', 'success')
+    else:
+        flash('Invalid code. Please try again.', 'error')
+    return redirect(url_for('settings_profile') + '#security')
+
+
+@app.route('/settings/disable-2fa', methods=['POST'])
+@login_required
+def settings_disable_2fa():
+    current_user.totp_enabled = False
+    current_user.totp_secret  = None
+    current_user.totp_pending = None
+    db.session.commit()
+    flash('Two-factor authentication has been disabled.', 'success')
+    return redirect(url_for('settings_profile') + '#security')
+
+# ── Notification inbox ────────────────────────────────────────
+@app.route('/notifications')
+@login_required
+def notifications():
+    notifs = Notification.query.filter_by(user_id=current_user.id)\
+                               .order_by(Notification.created_at.desc()).all()
+    # Mark all as read when viewed
+    for n in notifs:
+        n.read = True
+    db.session.commit()
+    return render_template('notifications.html', notifications=notifs)
+
+
+@app.route('/notifications/mark-read', methods=['POST'])
+@login_required
+def notifications_mark_read():
+    Notification.query.filter_by(user_id=current_user.id, read=False)\
+                      .update({'read': True})
+    db.session.commit()
+    flash('All notifications marked as read.', 'success')
+    return redirect(url_for('notifications'))
+
+
+@app.route('/notifications/clear', methods=['POST'])
+@login_required
+def notifications_clear():
+    Notification.query.filter_by(user_id=current_user.id).delete()
+    db.session.commit()
+    flash('Notifications cleared.', 'success')
+    return redirect(url_for('notifications'))
+
+
+@app.route('/notifications/<int:notif_id>/delete', methods=['POST'])
+@login_required
+def notification_delete(notif_id):
+    n = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
+    db.session.delete(n)
+    db.session.commit()
+    return redirect(url_for('notifications'))
+
+
+# ── Download management (admin) ───────────────────────────────
+@app.route('/admin/downloads/add', methods=['POST'])
+@admin_required
+def admin_add_download():
+    if not current_user.is_admin:
+        abort(403)
+    item = DownloadItem(
+        title          = request.form['title'].strip(),
+        artist         = request.form.get('artist', '').strip() or None,
+        album          = request.form.get('album',  '').strip() or None,
+        producer       = request.form.get('producer', '').strip() or None,
+        description    = request.form.get('description', '').strip() or None,
+        audio_path     = request.form['audio_path'].strip(),
+        stream_url     = request.form.get('stream_url', '').strip() or None,
+        sort_order     = int(request.form.get('sort_order', 0) or 0),
+        requires_login = 'requires_login' in request.form,
+    )
+    db.session.add(item)
+    db.session.commit()
+    # Optionally notify users who want new music alerts
+    _broadcast_notification(
+        notif_type = 'new_music',
+        title      = f'New track: {item.title}',
+        message    = f'{item.artist or "Goodchi"} just added "{item.title}" to Downloads.',
+        link       = url_for('download'),
+        pref_field = 'notif_new_music',
+    )
+    flash(f'Track "{item.title}" added.', 'success')
+    return redirect(url_for('admin_dashboard') + '#downloads')
+
+
+@app.route('/admin/downloads/<int:item_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_download(item_id):
+    if not current_user.is_admin:
+        abort(403)
+    item = DownloadItem.query.get_or_404(item_id)
+    if request.method == 'POST':
+        item.title          = request.form['title'].strip()
+        item.artist         = request.form.get('artist', '').strip() or None
+        item.album          = request.form.get('album',  '').strip() or None
+        item.producer       = request.form.get('producer', '').strip() or None
+        item.description    = request.form.get('description', '').strip() or None
+        item.audio_path     = request.form['audio_path'].strip()
+        item.stream_url     = request.form.get('stream_url', '').strip() or None
+        item.sort_order     = int(request.form.get('sort_order', 0) or 0)
+        item.requires_login = 'requires_login' in request.form
+        db.session.commit()
+        flash('Track updated.', 'success')
+        return redirect(url_for('admin_dashboard') + '#downloads')
+    return render_template('admin_edit_download.html', item=item)
+
+
+@app.route('/admin/downloads/<int:item_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_download(item_id):
+    if not current_user.is_admin:
+        abort(403)
+    item = DownloadItem.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    flash('Track deleted.', 'success')
+    return redirect(url_for('admin_dashboard') + '#downloads')
+
+# ── Admin: broadcast notification ────────────────────────────
+@app.route('/admin/notifications/broadcast', methods=['POST'])
+@admin_required
+def admin_broadcast_notification():
+    if not current_user.is_admin:
+        abort(403)
+    notif_type = request.form.get('notif_type', 'announcement')
+    title      = request.form['title'].strip()
+    message    = request.form['message'].strip()
+    link       = request.form.get('link', '').strip() or None
+
+    pref_map = {
+        'new_post':     'notif_new_posts',
+        'new_music':    'notif_new_music',
+        'announcement': 'notif_announcements',
+    }
+    count = _broadcast_notification(
+        notif_type = notif_type,
+        title      = title,
+        message    = message,
+        link       = link,
+        pref_field = pref_map.get(notif_type, 'notif_announcements'),
+    )
+    flash(f'Notification sent to {count} user(s).', 'success')
+    return redirect(url_for('admin_dashboard') + '#notifications_admin')
+
+
+# ── Internal broadcast helper ────────────────────────────────
+def _broadcast_notification(notif_type, title, message, link=None, pref_field=None):
+    """Create a Notification row for each qualifying user. Returns recipient count."""
+    query = User.query
+    if pref_field:
+        query = query.filter(getattr(User, pref_field) == True)
+    users = query.all()
+
+    for u in users:
+        n = Notification(
+            user_id = u.id,
+            type    = notif_type,
+            title   = title,
+            message = message,
+            link    = link,
+        )
+        db.session.add(n)
+
+    log = BroadcastLog(
+        notif_type      = notif_type,
+        title           = title,
+        message         = message,
+        link            = link,
+        recipient_count = len(users),
+    )
+    db.session.add(log)
+    db.session.commit()
+    return len(users)
+
 
 # Admin Dashboard Routes
 @app.route('/admin/posts')
@@ -429,6 +856,13 @@ def admin_new_post():
         db.session.add(post)
         db.session.commit()
 
+        _broadcast_notification(
+        notif_type = 'new_post',
+        title      = f'New story: {post.title}',
+        message    = post.excerpt[:120] if post.excerpt else 'A new story just dropped.',
+        link       = url_for('post', slug=post.slug),
+        pref_field = 'notif_new_posts',
+    )
         flash(f'Post "{title}" created successfully!', 'success')
         return redirect(url_for('admin_posts'))
 
@@ -473,7 +907,177 @@ def admin_delete_post(post_id):
     flash(f'Post "{title}" deleted successfully!', 'success')
     return redirect(url_for('admin_posts'))
 
+@app.route('/support')
+@login_required
+def support_page():
+    bank_details   = BankDetail.query.filter_by(is_active=True).all()
+    crypto_wallets = CryptoWallet.query.filter_by(is_active=True).all()
+    return render_template('support.html',
+                           bank_details=bank_details,
+                           crypto_wallets=crypto_wallets)
+
+
+@app.route('/support/pay', methods=['POST'])
+@login_required
+def support_pay():
+    """
+    Handle card payment submission.
+    In production: integrate Stripe here.
+    For now: record the intent and return success so the UI flow works.
+
+    To add real Stripe:
+        pip install stripe
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        intent = stripe.PaymentIntent.create(amount=int(amount*100), currency='usd', ...)
+    """
+    data   = request.get_json(force=True) or {}
+    amount = float(data.get('amount', 0) or 0)
+    name   = (data.get('name') or '').strip()
+
+    if amount < 1:
+        return jsonify({'success': False, 'error': 'Minimum amount is $1.'}), 400
+
+    try:
+        ref = _secrets.token_hex(16)
+        p   = SupportPayment(
+            user_id        = current_user.id if current_user.is_authenticated else None,
+            supporter_name = name or None,
+            amount         = amount,
+            method         = 'card',
+            reference      = ref,
+            status         = 'completed',   # replace with 'pending' when Stripe webhook confirms
+        )
+        db.session.add(p)
+        db.session.commit()
+        return jsonify({'success': True, 'reference': ref})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error('support_pay: %s', e)
+        return jsonify({'success': False, 'error': 'Could not record payment.'}), 500
+
+
+# ── Admin dashboard ────────────────────────────────────────────
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    total_users     = User.query.count()
+    total_payments  = SupportPayment.query.count()
+    total_supported = db.session.query(db.func.sum(SupportPayment.amount))\
+                        .filter_by(status='completed').scalar() or 0.0
+    total_posts     = Post.query.count()
+    recent_payments = SupportPayment.query.order_by(SupportPayment.created_at.desc()).limit(8).all()
+    all_payments    = SupportPayment.query.order_by(SupportPayment.created_at.desc()).all()
+    all_users       = User.query.order_by(User.created_at.desc()).all()
+    bank_details    = BankDetail.query.order_by(BankDetail.created_at.desc()).all()
+    crypto_wallets  = CryptoWallet.query.order_by(CryptoWallet.created_at.desc()).all()
+    all_db_posts    = Post.query.order_by(Post.created_at.desc()).all()
+    download_items    = DownloadItem.query.order_by(DownloadItem.sort_order, DownloadItem.created_at).all()
+    recent_broadcasts = BroadcastLog.query.order_by(BroadcastLog.created_at.desc()).limit(10).all()
+
+    return render_template('admin_dashboard.html',
+        total_users     = total_users,
+        total_payments  = total_payments,
+        total_supported = total_supported,
+        total_posts     = total_posts,
+        recent_payments = recent_payments,
+        all_payments    = all_payments,
+        all_users       = all_users,
+        bank_details    = bank_details,
+        crypto_wallets  = crypto_wallets,
+        all_db_posts    = all_db_posts,
+        download_items     = download_items,
+        recent_broadcasts  = recent_broadcasts,
+    )
+
+
+@app.route('/admin/user/<int:user_id>/toggle-admin', methods=['POST'])
+@admin_required
+def admin_toggle_admin(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash('You cannot change your own admin status.', 'warning')
+        return redirect(url_for('admin_dashboard'))
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    flash(f"{'Made' if user.is_admin else 'Removed'} admin: {user.username}", 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/user/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash('You cannot delete your own account from here.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'User {user.username} deleted.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/bank/add', methods=['POST'])
+@admin_required
+def admin_add_bank():
+    bank = BankDetail(
+        bank_name      = request.form.get('bank_name', '').strip(),
+        account_name   = request.form.get('account_name', '').strip(),
+        account_number = request.form.get('account_number', '').strip(),
+        sort_code      = request.form.get('sort_code', '').strip() or None,
+        iban           = request.form.get('iban', '').strip() or None,
+        swift          = request.form.get('swift', '').strip() or None,
+        country        = request.form.get('country', '').strip() or None,
+    )
+    db.session.add(bank)
+    db.session.commit()
+    flash('Bank account saved.', 'success')
+    return redirect(url_for('admin_dashboard') + '#tab-bank-trigger')
+
+
+@app.route('/admin/bank/<int:bank_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_bank(bank_id):
+    bank = BankDetail.query.get_or_404(bank_id)
+    db.session.delete(bank)
+    db.session.commit()
+    flash('Bank account deleted.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/wallet/add', methods=['POST'])
+@admin_required
+def admin_add_wallet():
+    wallet = CryptoWallet(
+        label   = request.form.get('label',   '').strip(),
+        network = request.form.get('network', '').strip() or None,
+        address = request.form.get('address', '').strip(),
+    )
+    db.session.add(wallet)
+    db.session.commit()
+    flash('Crypto wallet saved.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/wallet/<int:wallet_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_wallet(wallet_id):
+    wallet = CryptoWallet.query.get_or_404(wallet_id)
+    db.session.delete(wallet)
+    db.session.commit()
+    flash('Wallet address deleted.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# ── Startup: create tables + seed posts ──────────────────────
+# Runs under both gunicorn (Render) and the dev server.
+with app.app_context():
+    db.create_all()
+    try:
+        from seed_db import seed_posts
+        seed_posts(verbose=False)
+    except Exception as _seed_err:
+        print(f"[seed] skipped: {_seed_err}")
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)

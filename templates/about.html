@@ -1,37 +1,104 @@
 {% extends "base.html" %}
-
-{% block title %}About - Goodchi experience{% endblock %}
+{% block title %}About — Goodchi Experience{% endblock %}
 
 {% block content %}
-<section>
-	<h2>About Goodchi</h2>
-    <a href="{{ url_for('about') }}">
-        <img src="{{ url_for('static', filename='images/goodchi_sitingimg.jpeg') }}" alt="Goodchi img" style="height: 80px; width: auto; object-fit: contain;">
-    </a><br />
-	<p>Welcome to the Goodchi experience! This is where creativity meets technology.</p>
-	<p>Here, we showcase adventures, music, and software tools for creators and entrepreneurs.</p><br />
-    <h3>Who is Goodchi?</h3>
-    <p>Goodchi also known as Goodluck chibueze is a Lagos born nigerian hailing from Imo state, a music artist, software developer and entrepreneur. With a passion for both music and technology, Goodchi has been creating unique experiences that blend the two worlds together.</p>
-    <p>raised in a military/Business family, Goodchi has always been driven by a sense of discipline and determination, to help better improve the world.</p>
-    <p>From producing captivating music to developing innovative software tools, Goodchi is dedicated to pushing the boundaries of creativity and technology. The Goodchi experience is a platform where you can explore the latest advnetures, projects, music releases, and software innovations that Goodchi has to offer.</p>
-    <p>Whether you're a music lover, a tech enthusiast, or simply curious about the intersection of these two fields, the Goodchi experience has something for everyone. Join us on this exciting journey as we continue to create, innovate, and inspire!</p>
 
-    <h3>Our Mission</h3>
-    <p>Our mission is to create a unique and engaging experience that combines music, software development, and creative expression. We aim to inspire and empower creators and entrepreneurs by providing them with innovative tools and captivating content that showcases the endless possibilities of creativity and technology.</p>
-    <p>Through our platform, we strive to foster a community of like-minded individuals who are passionate about exploring the intersection of music and technology, and who are eager to collaborate, learn, and grow together.</p>
-    <p>We believe that by sharing our adventures, projects, and insights, we can inspire others to pursue their own creative passions and contribute to a vibrant and innovative creative ecosystem.</p>
+<div id="intro" style="padding-bottom:20px">
+  <h1>Who is Goodchi?</h1>
+  <p>Music artist. Software developer. Eternal explorer.</p>
+</div>
 
-    <h3>Our Story</h3>
-    <p>The Goodchi experience was born out of a desire to share the unique journey of Goodchi, a talented music artist and software developer. With a background in both music and technology, Goodchi has always been passionate about exploring the creative possibilities that arise from the intersection of these two fields.</p>
-    <p>Over the years, Goodchi has embarked on a journey of self-discovery and creative exploration, producing captivating music and developing innovative software tools that have garnered attention and admiration from fans and industry professionals alike.</p>
-    <p>As the Goodchi experience continues to evolve, we are excited to share our adventures, projects, and insights with a wider audience. We hope that our story will inspire others to pursue their own creative passions and contribute to a vibrant and innovative creative ecosystem.</p>
+<!-- Hero bio card -->
+<div class="orbit-card about-hero" style="margin-bottom:32px">
+  <div class="about-hero-media">
+    <img src="{{ url_for('static', filename='images/goodchi_sitingimg.jpeg') }}"
+         alt="Goodchi"
+         onerror="this.style.background='linear-gradient(135deg,#6c63ff,#0d0f1a)'" />
+  </div>
+  <div class="about-hero-body">
+    <div class="card-tag">✦ The Artist</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:700;color:var(--text-1);margin-bottom:14px;line-height:1.2">
+      Goodluck<br>Chibueze
+    </div>
+    <p style="font-size:0.95rem;color:var(--text-2);line-height:1.75;margin-bottom:16px">
+      Lagos-born, Imo-rooted. Music artist, software developer and entrepreneur driven by discipline,
+      curiosity and a relentless desire to build things that matter.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <span style="background:rgba(0,245,196,0.08);border:1px solid rgba(0,245,196,0.25);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--mint);font-family:'Space Grotesk',sans-serif;">Afrobeats</span>
+      <span style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.25);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--purple);font-family:'Space Grotesk',sans-serif;">Trap</span>
+      <span style="background:rgba(255,209,102,0.08);border:1px solid rgba(255,209,102,0.25);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--gold);font-family:'Space Grotesk',sans-serif;">Python</span>
+      <span style="background:rgba(0,245,196,0.08);border:1px solid rgba(0,245,196,0.2);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--mint);font-family:'Space Grotesk',sans-serif;">Electronic</span>
+    </div>
+  </div>
+</div>
 
-    <h3>fun fact</h3>
-    <p>Goodchi's first programming language was Python, which he used to create his initial music visualization tools.</p>
-    <p>Before fully diving into music production, Goodchi experimented with various software development projects, including a mobile app for music discovery.</p>
-    <p>Goodchi's music has been featured in several independent films and online media platforms, showcasing the versatility of his creative talents.</p>
-    <p>In addition to his music and software projects, Goodchi is also an avid traveler, reader, drawing inspiration from different cultures and experiences around the world to fuel his creativity.</p>
-    <p>Goodchi is known for his unique blend of musical genres, often incorporating elements of electronic, hip-hop, trap and traditional African music (Afrobeats) into his compositions, creating a distinctive sound that resonates with a diverse audience.</p>
-    <P>Goodchi is also a lover of nature and good weed, often finding inspiration in the great outdoors and the simple pleasures of life.</P>
-</section>
+<!-- Story sections as orbit cards -->
+<div class="section-label">The Journey</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;margin-bottom:40px">
+
+  <div class="orbit-card">
+    <div class="card-body" style="padding:28px">
+      <div class="card-tag">Origin</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;color:var(--text-1);margin-bottom:12px">Mission</h3>
+      <div class="about-section">
+        <p>Create a unique intersection of music and software — inspiring creators and entrepreneurs with tools that are as expressive as the art itself.</p>
+        <p>Through the Goodchi experience, we foster a community where technology and creativity fuel each other.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="orbit-card">
+    <div class="card-body" style="padding:28px">
+      <div class="card-tag">Background</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;color:var(--text-1);margin-bottom:12px">Story</h3>
+      <div class="about-section">
+        <p>Raised in a military and business family, discipline was always the foundation. That structure channelled into music production and software development simultaneously.</p>
+        <p>From mobile apps for music discovery to full-stack platforms, Goodchi has always moved between both worlds.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="orbit-card">
+    <div class="card-body" style="padding:28px">
+      <div class="card-tag">Sound</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;color:var(--text-1);margin-bottom:12px">The Music</h3>
+      <div class="about-section">
+        <p>Goodchi blends Afrobeats, trap, electronic and hip-hop into a distinctive sound — a soundtrack for builders, dreamers and travellers.</p>
+        <p>Featured in independent films and online platforms. The Genesis EP is the first chapter.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="orbit-card">
+    <div class="card-body" style="padding:28px">
+      <div class="card-tag">Fun facts</div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;color:var(--text-1);margin-bottom:12px">Did you know?</h3>
+      <ul style="list-style:none;font-size:0.92rem;color:var(--text-2);line-height:2">
+        <li>✦ First language: Python</li>
+        <li>✦ Avid traveller — 10+ countries</li>
+        <li>✦ Finds inspiration in nature</li>
+        <li>✦ Once built a music discovery app</li>
+        <li>✦ Loves good weed & good code</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- Support CTA -->
+<div class="orbit-card" style="text-align:center;padding:44px 24px">
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;color:var(--text-1);margin-bottom:10px">
+    Believe in the vision?
+  </div>
+  <p style="font-size:14px;color:var(--text-2);margin-bottom:24px;max-width:460px;margin-left:auto;margin-right:auto">
+    Support the Goodchi experience and help keep the music and software coming.
+    Every contribution — big or small — goes directly towards the next project.
+  </p>
+  <a href="{{ url_for('support_page') }}" class="btn-support" style="font-size:14px;padding:13px 32px">
+    ♥ Support Goodchi
+  </a>
+</div>
+
 {% endblock %}

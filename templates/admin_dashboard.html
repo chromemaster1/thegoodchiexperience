@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+{% block title %}Admin — Goodchi Experience{% endblock %}
+
+{% block content %}
+<div class="admin-shell" style="padding-top:70px">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-title">Dashboard</div>
+    <ul class="admin-nav">
+      <li><button class="active" onclick="showTab('overview', this)">📊 Overview</button></li>
+      <li><button onclick="showTab('users', this)">👥 Users</button></li>
+      <li><button onclick="showTab('payments', this)">💳 Payments</button></li>
+      <li><button onclick="showTab('bank', this)">🏦 Bank Details</button></li>
+      <li><button onclick="showTab('crypto', this)">₿ Crypto Wallets</button></li>
+      <li><button onclick="showTab('downloads', this)">🎵 Downloads</button></li>
+      <li><button onclick="showTab('posts', this)">📝 Posts</button></li>
+      <li><button onclick="showTab('notifications_admin', this)">🔔 Notifications</button></li>
+    </ul>
+    <div class="admin-sidebar-title">Site</div>
+    <ul class="admin-nav">
+      <li><a href="{{ url_for('home') }}">← Back to Site</a></li>
+    </ul>
+  </aside>
+
+  <!-- Main content -->
+  <div class="admin-content">
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div class="admin-tab-panel" id="tab-overview">
+      <div class="admin-stats">
+        <div class="stat-card">
+          <div class="stat-value">{{ total_users }}</div>
+          <div class="stat-label">Registered users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${{ '%.2f'|format(total_supported) }}</div>
+          <div class="stat-label">Total support received</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ total_payments }}</div>
+          <div class="stat-label">Support payments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ total_posts }}</div>
+          <div class="stat-label">Published posts</div>
+        </div>
+      </div>
+
+      <!-- Recent payments -->
+      <div class="admin-section-title">Recent Support Payments</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Time</th><th>Supporter</th><th>Amount</th><th>Method</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for p in recent_payments %}
+            <tr>
+              <td style="color:var(--text-3);font-size:11px">{{ p.created_at.strftime('%d %b %Y %H:%M') }}</td>
+              <td>{{ p.supporter_name or '—' }}<br><span style="font-size:11px;color:var(--text-3)">{{ p.user.email if p.user else p.email or 'anonymous' }}</span></td>
+              <td style="color:var(--mint);font-weight:700;font-family:'Space Grotesk',sans-serif">${{ '%.2f'|format(p.amount) }}</td>
+              <td><span class="badge badge-user">{{ p.method }}</span></td>
+              <td><span class="badge {{ 'badge-active' if p.status=='completed' else 'badge-off' }}">{{ p.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No payments yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ USERS ═══ -->
+    <div class="admin-tab-panel" id="tab-users" style="display:none">
+      <div class="admin-section-title">All Users</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>User</th><th>Email</th><th>Joined</th><th>Last login</th><th>Role</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for u in all_users %}
+            <tr>
+              <td style="font-weight:600;color:var(--text-1)">{{ u.username }}</td>
+              <td style="font-size:12px">{{ u.email }}</td>
+              <td style="font-size:11px;color:var(--text-3)">{{ u.created_at.strftime('%d %b %Y') }}</td>
+              <td style="font-size:11px;color:var(--text-3)">{{ u.last_login.strftime('%d %b %Y %H:%M') if u.last_login else '—' }}</td>
+              <td><span class="badge {{ 'badge-admin' if u.is_admin else 'badge-user' }}">{{ 'Admin' if u.is_admin else 'User' }}</span></td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=u.id) }}" style="display:inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-sm {{ 'danger' if u.is_admin else 'success' }}">
+                      {{ 'Remove admin' if u.is_admin else 'Make admin' }}
+                    </button>
+                  </form>
+                  {% if not u.is_admin %}
+                  <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" style="display:inline"
+                        onsubmit="return confirm('Delete {{ u.username }}? This cannot be undone.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-sm danger">Delete</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No users</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ PAYMENTS ═══ -->
+    <div class="admin-tab-panel" id="tab-payments" style="display:none">
+      <div class="admin-section-title">All Support Payments</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Date</th><th>Supporter</th><th>Email</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for p in all_payments %}
+            <tr>
+              <td style="font-size:11px;color:var(--text-3)">{{ p.created_at.strftime('%d %b %Y %H:%M') }}</td>
+              <td>{{ p.supporter_name or '—' }}</td>
+              <td style="font-size:11px">{{ p.user.email if p.user else p.email or '—' }}</td>
+              <td style="color:var(--mint);font-weight:700">${{ '%.2f'|format(p.amount) }}</td>
+              <td><span class="badge badge-user">{{ p.method }}</span></td>
+              <td class="mono" style="font-size:10px">{{ p.reference[:14] if p.reference else '—' }}…</td>
+              <td><span class="badge {{ 'badge-active' if p.status=='completed' else 'badge-off' }}">{{ p.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px">No payments</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ BANK DETAILS ═══ -->
+    <div class="admin-tab-panel" id="tab-bank" style="display:none">
+      <div class="admin-section-title">Bank Details</div>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">
+        These details appear on the "Bank Transfer" tab of the Support page — no code changes needed.
+      </p>
+
+      <!-- Add new bank -->
+      <div class="admin-form-card">
+        <h3>Add Bank Account</h3>
+        <form method="POST" action="{{ url_for('admin_add_bank') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Bank name</label>
+              <input name="bank_name" class="admin-input" placeholder="e.g. Access Bank" required />
+            </div>
+            <div>
+              <label class="admin-label">Country / Currency</label>
+              <input name="country" class="admin-input" placeholder="e.g. Nigeria (NGN)" />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Account name</label>
+              <input name="account_name" class="admin-input" placeholder="Goodluck Chibueze" required />
+            </div>
+            <div>
+              <label class="admin-label">Account number</label>
+              <input name="account_number" class="admin-input" placeholder="0123456789" required />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Sort code / IFSC (optional)</label>
+              <input name="sort_code" class="admin-input" placeholder="12-34-56" />
+            </div>
+            <div>
+              <label class="admin-label">IBAN (optional)</label>
+              <input name="iban" class="admin-input" placeholder="GB29NWBK..." />
+            </div>
+          </div>
+          <div>
+            <label class="admin-label">SWIFT / BIC (optional)</label>
+            <input name="swift" class="admin-input" placeholder="BOFAUS3N" style="max-width:300px" />
+          </div>
+          <button type="submit" class="btn-admin-save">Save Bank Account</button>
+        </form>
+      </div>
+
+      <!-- Existing banks -->
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Bank</th><th>Account name</th><th>Account number</th><th>Country</th><th>SWIFT</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for b in bank_details %}
+            <tr>
+              <td style="font-weight:600;color:var(--text-1)">{{ b.bank_name }}</td>
+              <td>{{ b.account_name }}</td>
+              <td class="mono">{{ b.account_number }}</td>
+              <td style="font-size:12px;color:var(--text-3)">{{ b.country or '—' }}</td>
+              <td class="mono" style="font-size:11px">{{ b.swift or '—' }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_delete_bank', bank_id=b.id) }}"
+                      onsubmit="return confirm('Delete this bank detail?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-sm danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No bank details added yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ CRYPTO WALLETS ═══ -->
+    <div class="admin-tab-panel" id="tab-crypto" style="display:none">
+      <div class="admin-section-title">Crypto Wallet Addresses</div>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">
+        These addresses appear on the "Crypto" tab of the Support page.
+      </p>
+
+      <!-- Add wallet -->
+      <div class="admin-form-card">
+        <h3>Add Wallet Address</h3>
+        <form method="POST" action="{{ url_for('admin_add_wallet') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Label</label>
+              <input name="label" class="admin-input" placeholder="Bitcoin (BTC)" required />
+            </div>
+            <div>
+              <label class="admin-label">Network</label>
+              <input name="network" class="admin-input" placeholder="Bitcoin Mainnet" />
+            </div>
+          </div>
+          <label class="admin-label">Wallet address</label>
+          <input name="address" class="admin-input" placeholder="bc1q..." required />
+          <button type="submit" class="btn-admin-save">Save Wallet</button>
+        </form>
+      </div>
+
+      <!-- Existing wallets -->
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Label</th><th>Network</th><th>Address</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for w in crypto_wallets %}
+            <tr>
+              <td style="font-weight:600;color:var(--text-1)">{{ w.label }}</td>
+              <td><span class="badge badge-user">{{ w.network }}</span></td>
+              <td class="mono" style="font-size:11px;word-break:break-all">{{ w.address }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_delete_wallet', wallet_id=w.id) }}"
+                      onsubmit="return confirm('Delete this wallet address?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-sm danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No wallets added yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ DOWNLOADS ═══ -->
+    <div class="admin-tab-panel" id="tab-downloads" style="display:none">
+      <div class="admin-section-title">Download Tracks</div>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">
+        Add tracks here and they instantly appear as cards on the public Downloads page.
+      </p>
+
+      <!-- Add track -->
+      <div class="admin-form-card">
+        <h3>Add Track / Download Item</h3>
+        <form method="POST" action="{{ url_for('admin_add_download') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Track title *</label>
+              <input name="title" class="admin-input" placeholder="e.g. 247pnb" required />
+            </div>
+            <div>
+              <label class="admin-label">Artist</label>
+              <input name="artist" class="admin-input" placeholder="Goodchi" />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Album / EP</label>
+              <input name="album" class="admin-input" placeholder="Genesis EP" />
+            </div>
+            <div>
+              <label class="admin-label">Producer</label>
+              <input name="producer" class="admin-input" placeholder="JoeBagZ" />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Audio file path (static folder) *</label>
+              <input name="audio_path" class="admin-input" placeholder="audio file/track.mp3" required />
+              <small style="color:var(--text-3);font-size:11px">Relative to static/ — e.g. <code>audio file/Goodchi_247pnb.mp3</code></small>
+            </div>
+            <div>
+              <label class="admin-label">Stream URL (optional)</label>
+              <input name="stream_url" class="admin-input" placeholder="https://soundcloud.com/..." />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Description (optional)</label>
+              <input name="description" class="admin-input" placeholder="Short note about the track" />
+            </div>
+            <div>
+              <label class="admin-label">Sort order</label>
+              <input name="sort_order" type="number" class="admin-input" value="0" style="max-width:120px" />
+              <small style="color:var(--text-3);font-size:11px">Lower = first</small>
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer">
+            <input type="checkbox" name="requires_login" checked style="width:16px;height:16px" />
+            <span style="font-size:13px;color:var(--text-2)">Require login to download</span>
+          </label>
+          <button type="submit" class="btn-admin-save" style="margin-top:16px">Add Track</button>
+        </form>
+      </div>
+
+      <!-- Track list -->
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>#</th><th>Title</th><th>Artist</th><th>Album</th><th>File path</th><th>Login?</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for item in download_items %}
+            <tr>
+              <td style="color:var(--text-3);font-size:11px">{{ item.sort_order }}</td>
+              <td style="font-weight:600;color:var(--text-1)">{{ item.title }}</td>
+              <td style="font-size:12px">{{ item.artist or '—' }}</td>
+              <td style="font-size:12px;color:var(--text-3)">{{ item.album or '—' }}</td>
+              <td class="mono" style="font-size:10px;word-break:break-all">{{ item.audio_path }}</td>
+              <td><span class="badge {{ 'badge-active' if item.requires_login else 'badge-off' }}">{{ 'Yes' if item.requires_login else 'No' }}</span></td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <a href="{{ url_for('admin_edit_download', item_id=item.id) }}" class="btn-sm">Edit</a>
+                  <form method="POST" action="{{ url_for('admin_delete_download', item_id=item.id) }}"
+                        onsubmit="return confirm('Delete this track?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-sm danger">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px">No tracks added yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ NOTIFICATIONS (ADMIN BROADCAST) ═══ -->
+    <div class="admin-tab-panel" id="tab-notifications_admin" style="display:none">
+      <div class="admin-section-title">Broadcast Notification</div>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">
+        Send a notification to all registered users. It will appear in their notification inbox.
+      </p>
+
+      <div class="admin-form-card">
+        <h3>Send to All Users</h3>
+        <form method="POST" action="{{ url_for('admin_broadcast_notification') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-form-row">
+            <div>
+              <label class="admin-label">Type</label>
+              <select name="notif_type" class="admin-input">
+                <option value="announcement">📣 Announcement</option>
+                <option value="new_post">📝 New post</option>
+                <option value="new_music">🎵 New music</option>
+              </select>
+            </div>
+            <div>
+              <label class="admin-label">Link (optional)</label>
+              <input name="link" class="admin-input" placeholder="/post/my-slug" />
+            </div>
+          </div>
+          <div>
+            <label class="admin-label">Title *</label>
+            <input name="title" class="admin-input" placeholder="New track just dropped!" required />
+          </div>
+          <div style="margin-top:12px">
+            <label class="admin-label">Message *</label>
+            <textarea name="message" class="admin-input" rows="3"
+                      placeholder="Short description shown in notification..." required></textarea>
+          </div>
+          <button type="submit" class="btn-admin-save" style="margin-top:16px">📣 Broadcast</button>
+        </form>
+      </div>
+
+      <div class="admin-section-title" style="margin-top:28px">Recent Broadcasts</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Date</th><th>Type</th><th>Title</th><th>Recipients</th></tr>
+          </thead>
+          <tbody>
+            {% for b in recent_broadcasts %}
+            <tr>
+              <td style="font-size:11px;color:var(--text-3)">{{ b.created_at.strftime('%d %b %Y %H:%M') }}</td>
+              <td><span class="badge badge-user">{{ b.notif_type }}</span></td>
+              <td style="font-weight:600;color:var(--text-1)">{{ b.title }}</td>
+              <td style="font-size:12px;color:var(--text-3)">{{ b.recipient_count }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No broadcasts yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ POSTS ═══ -->
+    <div class="admin-tab-panel" id="tab-posts" style="display:none">
+      <div class="admin-section-title">Manage Posts</div>
+      <a href="{{ url_for('admin_posts') }}" class="btn-primary" style="margin-bottom:20px;display:inline-flex">
+        + New Post
+      </a>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Title</th><th>Slug</th><th>Date</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for p in all_db_posts %}
+            <tr>
+              <td style="font-weight:600;color:var(--text-1)">{{ p.title }}</td>
+              <td class="mono" style="font-size:11px">{{ p.slug }}</td>
+              <td style="font-size:11px;color:var(--text-3)">{{ p.date }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <a href="{{ url_for('post', slug=p.slug) }}" class="btn-sm">View</a>
+                  <a href="{{ url_for('admin_edit_post', post_id=p.id) }}" class="btn-sm">Edit</a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No posts</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /admin-content -->
+</div><!-- /admin-shell -->
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.admin-tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.admin-nav button').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.style.display = 'block';
+  if (btn) btn.classList.add('active');
+}
+</script>
+{% endblock %}

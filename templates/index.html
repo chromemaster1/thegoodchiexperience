@@ -1,69 +1,127 @@
-
 {% extends "base.html" %}
+{% block title %}Goodchi Experience — Home{% endblock %}
 
 {% block content %}
-	<!-- Intro -->
-	<div id="intro">
-	<h1>This is the Goodchi experience </h1><br />
-	<p>A fun way for me to showcase my adventures and versatile art piece, both musical and software. having fun while building useful software tools for creators and entreprenuers.</p>
-	<p>Probably add a visual road map so you can see all our favourite stops or mixes. "loves n kisses</p>
-	<p>for business inquiries and collaborations send a mail <a href="mailto:gchibueze96@gmail.com">here</a> </p>
-	<p>follow and support the movement on social media; x and ig <a href="https://x.com/iam_ggmusic"> @iam_ggmusic </a>, <a href="https://instagram.com/Goodchi_thesound">@Goodchi_thesound</a></p>
-	</div>
 
-<!-- Featured Post -->
-	{% if posts and pagination.page == 1 %}
-	<article class="post featured">
-		<div class="post-content">
-			<span class="date">{{ posts[0].date }}</span>
-			<h2><a href="{{ url_for('post', slug=posts[0].slug) }}">{{ posts[0].title }}</a></h2>
-		</div>
-		<a href="{{ url_for('post', slug=posts[0].slug) }}" class="image main"><img src="{{ url_for('static', filename=posts[0].image) }}" alt="{{ posts[0].title }}" /></a>
-		<p>{{ posts[0].excerpt }}</p>
-		<ul class="actions special">
-			<li><a href="{{ url_for('post', slug=posts[0].slug) }}" class="button large">Full Story</a></li>
-		</ul>
-	</article>
-	{% endif %}
+<!-- ── Intro ── -->
+<div id="intro">
+  <h1>The Goodchi Experience</h1>
+  <p>Music, code &amp; creative exploration — a journey through sound, software and soul.</p>
+  <p>
+    Collaborations &amp; business:
+    <a href="mailto:gchibueze96@gmail.com">gchibueze96@gmail.com</a>
+  </p>
+  <p>
+    Follow the movement:
+    <a href="https://x.com/iam_ggmusic" target="_blank" rel="noopener">@iam_ggmusic</a> ·
+    <a href="https://instagram.com/Goodchi_thesound" target="_blank" rel="noopener">@Goodchi_thesound</a>
+  </p>
+</div>
 
-<!-- Posts -->
-	<section class="posts">
-		{% set post_list = posts[1:] if pagination.page == 1 and posts else posts %}
-		{% for post in post_list %}
-		<article>
-			<div class="post-content">
-				<span class="date">{{ post.date }}</span>
-				<h2><a href="{{ url_for('post', slug=post.slug) }}">{{ post.title }}</a></h2>
-			</div>
-			<a href="{{ url_for('post', slug=post.slug) }}" class="image fit"><img src="{{ url_for('static', filename=post.image) }}" alt="{{ post.title }}" /></a>
-			<p>{{ post.excerpt }}</p>
-			<ul class="actions special">
-				<li><a href="{{ url_for('post', slug=post.slug) }}" class="button">Full Story</a></li>
-			</ul>
-		</article>
-		{% endfor %}
-	</section>
+<!-- ── Notification banner for new posts (authenticated users only) ── -->
+{% if current_user.is_authenticated and unread_notifications %}
+<div class="notif-banner">
+  <span class="notif-banner-icon">🔔</span>
+  <span>You have <strong>{{ unread_notifications }}</strong> new update{{ 's' if unread_notifications != 1 else '' }}.</span>
+  <a href="{{ url_for('notifications') }}" class="notif-banner-link">View all →</a>
+  <button class="notif-banner-close" onclick="this.parentElement.style.display='none'">✕</button>
+</div>
+{% endif %}
 
-	<!-- Footer -->
-	<footer>
-		<div class="pagination">
-			{% if pagination.has_prev %}
-			<a href="{{ url_for('home', page=pagination.prev_num) }}" class="previous">Prev</a>
-			{% endif %}
-			{% for page_num in pagination.iter_pages(left_edge=1, left_current=2, right_current=3, right_edge=1) %}
-			{% if page_num %}
-			{% if pagination.page == page_num %}
-			<a href="{{ url_for('home', page=page_num) }}" class="page active">{{ page_num }}</a>
-			{% else %}
-			<a href="{{ url_for('home', page=page_num) }}" class="page">{{ page_num }}</a>
-			{% endif %}
-			{% else %}
-			<span class="extra">&hellip;</span>
-			{% endif %}
-			{% endfor %}
-			{% if pagination.has_next %}
-			<a href="{{ url_for('home', page=pagination.next_num) }}" class="next">Next</a>
-			{% endif %}
-		</div>
-	</footer>
+<!-- ── Featured Post ── -->
+{% if posts %}
+  {% set page_num = pagination.page if pagination else 1 %}
+  {% if page_num == 1 %}
+  <div class="section-label">Featured Story</div>
+  <article class="post featured orbit-card">
+    <div class="orbit-card-inner">
+      <div class="card-media">
+        <a href="{{ url_for('post', slug=posts[0].slug) }}">
+          <img src="{{ url_for('static', filename=posts[0].image) }}"
+               alt="{{ posts[0].title }}"
+               onerror="this.style.display='none'" />
+        </a>
+      </div>
+      <div class="card-body">
+        <div class="card-tag">✦ Feature</div>
+        <div class="card-date">{{ posts[0].date }}</div>
+        <a class="card-title" href="{{ url_for('post', slug=posts[0].slug) }}" style="font-size:1.4rem">
+          {{ posts[0].title }}
+        </a>
+        <p class="card-excerpt">{{ posts[0].excerpt }}</p>
+        <div class="card-actions">
+          <a href="{{ url_for('post', slug=posts[0].slug) }}" class="btn-primary">Full Story →</a>
+          <a href="{{ url_for('support_page') }}" class="btn-support">♥ Support</a>
+        </div>
+      </div>
+    </div>
+  </article>
+  {% endif %}
+
+  <!-- ── Posts Grid ── -->
+  {% set post_list = posts[1:] if page_num == 1 else posts %}
+  {% if post_list %}
+  <div class="section-label" style="margin-top:40px">All Stories</div>
+  <section class="posts">
+    {% for post in post_list %}
+    <article class="orbit-card">
+      <div class="orbit-card-inner" style="display:flex;flex-direction:column;height:100%">
+        <div class="card-media">
+          <a href="{{ url_for('post', slug=post.slug) }}">
+            <img src="{{ url_for('static', filename=post.image) }}"
+                 alt="{{ post.title }}"
+                 onerror="this.style.display='none'" />
+          </a>
+        </div>
+        <div class="card-body">
+          <div class="card-date">{{ post.date }}</div>
+          <a class="card-title" href="{{ url_for('post', slug=post.slug) }}">{{ post.title }}</a>
+          <p class="card-excerpt">{{ post.excerpt }}</p>
+          <div class="card-actions">
+            <a href="{{ url_for('post', slug=post.slug) }}" class="btn-primary">Read →</a>
+            <a href="{{ url_for('support_page') }}" class="btn-support">♥ Support</a>
+          </div>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+{% else %}
+  <!-- No posts yet — show a friendly placeholder -->
+  <div class="orbit-card" style="text-align:center;padding:60px 24px;margin-top:32px">
+    <div style="font-size:2.5rem;margin-bottom:12px">🎵</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;color:var(--text-1);margin-bottom:8px">
+      Stories coming soon
+    </div>
+    <p style="font-size:14px;color:var(--text-2);max-width:420px;margin:0 auto 24px">
+      The first chapter is being written. Follow on socials for updates.
+    </p>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('admin_new_post') }}" class="btn-primary">+ Create First Post</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- ── Pagination ── -->
+{% if pagination and (pagination.has_prev or pagination.has_next) %}
+<div class="pagination">
+  {% if pagination.has_prev %}
+    <a href="{{ url_for('home', page=pagination.prev_num) }}">← Prev</a>
+  {% endif %}
+  {% for page_num in pagination.iter_pages(left_edge=1, left_current=2, right_current=3, right_edge=1) %}
+    {% if page_num %}
+      <a href="{{ url_for('home', page=page_num) }}"
+         class="{% if pagination.page == page_num %}active{% endif %}">{{ page_num }}</a>
+    {% else %}
+      <span>…</span>
+    {% endif %}
+  {% endfor %}
+  {% if pagination.has_next %}
+    <a href="{{ url_for('home', page=pagination.next_num) }}">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
 {% endblock %}

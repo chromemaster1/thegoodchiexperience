@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Verify Identity — Goodchi Experience{% endblock %}
+
+{% block content %}
+<div style="padding-top:120px;max-width:420px;margin:0 auto;padding-bottom:60px">
+
+  <div class="orbit-card" style="padding:40px 32px;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:12px">🔐</div>
+    <h1 style="font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;color:var(--text-1);margin-bottom:8px">
+      Two-Factor Verification
+    </h1>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:28px">
+      Enter the 6-digit code from your authenticator app to complete sign-in.
+    </p>
+
+    {% if error %}
+    <div class="flash error" style="margin-bottom:20px;text-align:left">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('verify_2fa_login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="totp_code" maxlength="6" inputmode="numeric" autofocus
+             style="width:100%;text-align:center;font-size:2rem;letter-spacing:8px;
+                    background:var(--surface-2);border:1px solid var(--border);
+                    border-radius:8px;padding:16px;color:var(--text-1);
+                    font-family:'Space Grotesk',sans-serif;box-sizing:border-box"
+             placeholder="000000" required />
+      <button type="submit" class="btn-primary" style="width:100%;margin-top:16px;padding:14px;font-size:1rem">
+        Verify →
+      </button>
+    </form>
+
+    <p style="font-size:12px;color:var(--text-3);margin-top:20px">
+      Lost access to your authenticator?
+      <a href="mailto:gchibueze96@gmail.com" style="color:var(--mint)">Contact support</a>
+    </p>
+  </div>
+
+</div>
+{% endblock %}

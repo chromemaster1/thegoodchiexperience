@@ -1,68 +1,90 @@
 {% extends "base.html" %}
-
-{% block title %}{{ post.title }} - Goodchi experience{% endblock %}
+{% block title %}{{ post.title }} — Goodchi Experience{% endblock %}
 
 {% block content %}
-	<!-- Post Detail -->
-	<article class="post featured">
-		<header class="major">
-			<span class="date">{{ post.date }}</span>
-			<h2>{{ post.title }}</h2>
-		</header>
-		<a href="#" class="image main"><img src="{{ url_for('static', filename=post.image) }}" alt="{{ post.title }}" /></a>
 
-		<div class="post-content">
-			{{ post.content | safe }}
-		</div>
+<!-- Post hero -->
+<div style="padding-top:90px">
 
-		{% if genesis_songs %}
-		<section class="genesis-ep">
-			<h3>Genesis EP Tracklist</h3>
-			<ol>
-				{% for song in genesis_songs %}
-				<li>
-					<strong>{{ song.title }}</strong>
-					<div class="genesis-actions">
-						{% if current_user.is_authenticated %}
-							<a href="{{ song.listen_url }}" class="button small">Listen</a>
-							<a href="{{ song.download_url }}" class="button small">Download</a>
-						{% else %}
-							<a href="{{ url_for('login') }}" class="button small">Login to Listen</a>
-							<a href="{{ url_for('login') }}" class="button small">Login to Download</a>
-						{% endif %}
-					</div>
-					<ul class="genesis-videos">
-						{% for video in song.video_links %}
-						<li><a href="{{ video.url }}" target="_blank" rel="noopener">{{ video.label }}</a></li>
-						{% endfor %}
-					</ul>
-				</li>
-				{% endfor %}
-			</ol>
-		</section>
+  <div class="post-hero-card orbit-card">
+    <img class="post-hero-img"
+         src="{{ url_for('static', filename=post.image) }}"
+         alt="{{ post.title }}"
+         onerror="this.style.display='none'" />
+    <div class="post-header-card">
+      <div class="card-tag">✦ Story</div>
+      <div class="card-date">{{ post.date }}</div>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;color:var(--text-1);line-height:1.2;margin-top:8px">
+        {{ post.title }}
+      </h1>
+    </div>
+  </div>
 
-		<section class="photo-gallery">
-			<h3>Genesis Album Photo Highlights</h3>
-			<div class="gallery-grid">
-				{% for img in genesis_gallery %}
-				<figure>
-					<img src="{{ url_for('static', filename=img) }}" alt="Genesis backstage photo" />
-				</figure>
-				{% endfor %}
-			</div>
-		</section>
-		{% endif %}
+  <!-- Post content -->
+  <div class="post-content-card orbit-card">
+    {{ post.content | safe }}
+  </div>
 
-		<div class="post-navigation">
-			<ul class="actions">
-				<li><a href="{{ url_for('home') }}" class="button">Back to Home</a></li>
-			</ul>
-		</div>
-	</article>
+  <!-- Genesis EP section -->
+  {% if genesis_songs %}
+  <div class="genesis-card orbit-card" style="margin-bottom:24px">
+    <h3>Genesis EP — Tracklist</h3>
+    <ol style="list-style:none">
+      {% for song in genesis_songs %}
+      <div class="genesis-track">
+        <span class="genesis-track-num">{{ loop.index }}</span>
+        <div style="flex:1;min-width:0">
+          <div class="genesis-track-title">{{ song.title }}</div>
+          {% if song.video_links %}
+          <div class="genesis-video-links">
+            {% for video in song.video_links %}
+            <a href="{{ video.url }}" target="_blank" rel="noopener">{{ video.label }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="genesis-track-actions">
+          {% if current_user.is_authenticated %}
+            <a href="{{ song.listen_url }}"   class="btn-ghost">▶ Listen</a>
+            <a href="{{ song.download_url }}" class="btn-primary">↓ Download</a>
+          {% else %}
+            <a href="{{ url_for('login') }}" class="btn-ghost">Login to listen</a>
+          {% endif %}
+          <a href="{{ url_for('support_page') }}" class="btn-support">♥</a>
+        </div>
+      </div>
+      {% endfor %}
+    </ol>
+  </div>
 
-	<!-- Related Posts Section -->
-	<section class="posts">
-		<h2>More Stories</h2>
-		<!-- You can add related posts logic here in the future -->
-	</section>
+  <!-- Gallery -->
+  {% if genesis_gallery %}
+  <div class="genesis-card orbit-card">
+    <h3>Genesis — Photo Highlights</h3>
+    <div class="gallery-grid">
+      {% for img in genesis_gallery %}
+      <figure>
+        <img src="{{ url_for('static', filename=img) }}" alt="Genesis photo" />
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Support CTA -->
+  <div class="orbit-card" style="text-align:center;padding:40px 24px;margin-bottom:24px">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;color:var(--text-1);margin-bottom:8px">
+      Enjoyed this?
+    </div>
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:20px">
+      Support the artist and help fuel the next creation.
+    </p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="{{ url_for('home') }}" class="btn-ghost">← Back to Home</a>
+      <a href="{{ url_for('support_page') }}" class="btn-support">♥ Pay What You Want</a>
+    </div>
+  </div>
+
+</div>
 {% endblock %}
