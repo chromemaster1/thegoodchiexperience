@@ -21,7 +21,16 @@
            alt="Goodchi"
            onerror="this.style.display='none'">
     </a>
-    <nav>
+
+    <!-- Hamburger button (mobile only) -->
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav id="siteNav">
+      <!-- Close button inside the menu (mobile) -->
+      <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
+
       <ul class="links">
         <li class="{% if request.endpoint == 'home' %}active{% endif %}">
           <a href="{{ url_for('home') }}">Home</a>
@@ -66,6 +75,9 @@
         {% endif %}
       </ul>
     </nav>
+
+    <!-- Overlay (mobile) -->
+    <div class="nav-overlay" id="navOverlay"></div>
   </header>
 
   <!-- Flash messages -->
@@ -115,6 +127,120 @@
 
 </div><!-- /wrapper -->
 
+<!-- ── Mobile nav CSS ── -->
+<style>
+/* Hamburger button */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 1001;
+  position: relative;
+}
+.nav-toggle span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--text-1, #fff);
+  border-radius: 2px;
+  transition: transform 0.25s, opacity 0.2s;
+}
+/* Animate to X when open */
+.nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-toggle.open span:nth-child(2) { opacity: 0; }
+.nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Close button inside drawer */
+.nav-close {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-2, #aaa);
+  font-size: 1.2rem;
+  cursor: pointer;
+  align-self: flex-end;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+}
+
+/* Overlay behind drawer */
+.nav-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+}
+.nav-overlay.active { display: block; }
+
+@media (max-width: 768px) {
+  /* Show hamburger */
+  .nav-toggle { display: flex; }
+
+  /* Hide desktop nav, show as slide-in drawer */
+  #siteNav {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: min(300px, 85vw);
+    height: 100dvh;
+    background: var(--surface-1, #0d0d1a);
+    border-left: 1px solid var(--border, rgba(255,255,255,0.08));
+    z-index: 1000;
+    transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+    padding: 20px 0 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  #siteNav.open { right: 0; }
+
+  .nav-close { display: flex; margin: 0 16px 12px auto; }
+
+  #siteNav .links {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #siteNav .links li a {
+    display: block;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-1, #fff);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border, rgba(255,255,255,0.05));
+    transition: background 0.15s, padding-left 0.15s;
+  }
+  #siteNav .links li a:hover,
+  #siteNav .links li.active a {
+    background: rgba(255,255,255,0.04);
+    padding-left: 32px;
+    color: var(--mint, #00f5c4);
+  }
+
+  /* Notif bell in mobile nav */
+  #siteNav .notif-bell-link {
+    display: block;
+    padding: 14px 24px;
+    font-size: 15px;
+    border-bottom: 1px solid var(--border, rgba(255,255,255,0.05));
+  }
+}
+</style>
+
 <!-- ── Star-field script ── -->
 <script>
 (function() {
@@ -138,7 +264,6 @@
       color: Math.random() > 0.85 ? '#6c63ff' : Math.random() > 0.7 ? '#00f5c4' : '#ffffff',
       alpha: Math.random() * 0.7 + 0.2,
     }));
-    // A handful of larger nebula blobs
     stars.nebulae = Array.from({length: 6}, () => ({
       x:  Math.random() * W,
       y:  Math.random() * H,
@@ -149,8 +274,6 @@
 
   function draw(ts) {
     ctx.clearRect(0, 0, W, H);
-
-    // nebula glows
     stars.nebulae.forEach(n => {
       const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
       grd.addColorStop(0,   `rgba(${n.hue},0.06)`);
@@ -160,15 +283,11 @@
       ctx.fillStyle = grd;
       ctx.fill();
     });
-
-    // stars
     const t = ts * 0.0005;
     stars.forEach(s => {
       const a = s.alpha * (0.7 + 0.3 * Math.sin(t * s.speed * 5 + s.pulse));
       ctx.beginPath();
       ctx.arc(s.x, (s.y + scroll * s.speed * 0.12) % H, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = s.color.replace(')', `,${a})`).replace('rgb', 'rgba').replace('#ffffff', `rgba(255,255,255,${a})`);
-      // fallback for hex
       if (s.color.startsWith('#')) {
         ctx.globalAlpha = a;
         ctx.fillStyle = s.color;
@@ -195,8 +314,45 @@ const orbitObserver = new IntersectionObserver((entries) => {
     }
   });
 }, { threshold: 0.08 });
-
 document.querySelectorAll('.orbit-card').forEach(el => orbitObserver.observe(el));
+
+// ── Mobile hamburger menu ──
+(function() {
+  const toggle  = document.getElementById('navToggle');
+  const nav     = document.getElementById('siteNav');
+  const close   = document.getElementById('navClose');
+  const overlay = document.getElementById('navOverlay');
+  if (!toggle || !nav) return;
+
+  function openMenu() {
+    nav.classList.add('open');
+    toggle.classList.add('open');
+    overlay.classList.add('active');
+    toggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenu() {
+    nav.classList.remove('open');
+    toggle.classList.remove('open');
+    overlay.classList.remove('active');
+    toggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+
+  toggle.addEventListener('click', () => {
+    nav.classList.contains('open') ? closeMenu() : openMenu();
+  });
+
+  if (close)   close.addEventListener('click', closeMenu);
+  if (overlay) overlay.addEventListener('click', closeMenu);
+
+  // Close on nav link click (so drawer closes after navigating)
+  nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+
+  // Close on Escape
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+})();
 </script>
 
 </body>

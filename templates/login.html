@@ -22,7 +22,7 @@
 
 		<form method="post" novalidate style="display: flex; flex-direction: column;">
 			{{ form.hidden_tag() }}
-			
+
 			<div style="margin-bottom: 20px;">
 				<label for="username" style="display: block; margin-bottom: 8px; font-weight: 600; color: #00d4ff;">👤 Username</label>
 				{{ form.username(class="auth-input", placeholder="Enter your username", style="width: 100%; padding: 12px 15px; border: 1.5px solid rgba(138, 43, 226, 0.3); border-radius: 8px; background: rgba(30, 30, 60, 0.5); color: white; font-size: 14px; box-sizing: border-box; transition: all 0.3s ease;") }}
@@ -38,7 +38,7 @@
 					<div style="color: #ef4444; font-size: 12px; margin-top: 5px;">{{ form.password.errors[0] }}</div>
 				{% endif %}
 			</div>
-
+			<a href="{{ url_for('forgot_password') }}" style="align-self: flex-end; margin-bottom: 20px; color: #00d4ff; font-size: 14px; text-decoration: none; transition: color 0.3s ease;">Forgot password?</a>
 			<button type="submit" style="padding: 14px; background: linear-gradient(135deg, #8a2be2 0%, #00d4ff 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 15px; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4);">✓ Sign In</button>
 		</form>
 
@@ -65,4 +65,3 @@
 	}
 </style>
 {% endblock %}
-

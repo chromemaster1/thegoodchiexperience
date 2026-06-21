@@ -19,6 +19,9 @@
     </ul>
     <div class="admin-sidebar-title">Site</div>
     <ul class="admin-nav">
+      <li><a href="{{ url_for('admin_messages') }}" style="color:var(--mint)">
+        💬 Messages{% if unread_tickets %} <span class="notif-badge" style="position:static;margin-left:4px">{{ unread_tickets }}</span>{% endif %}
+      </a></li>
       <li><a href="{{ url_for('home') }}">← Back to Site</a></li>
     </ul>
   </aside>
@@ -56,7 +59,52 @@
           <div class="stat-value">{{ total_posts }}</div>
           <div class="stat-label">Published posts</div>
         </div>
+        <div class="stat-card" style="{% if unread_tickets %}border-color:var(--mint){% endif %}">
+          <div class="stat-value" style="{% if unread_tickets %}color:var(--mint){% endif %}">{{ open_tickets }}</div>
+          <div class="stat-label">Open support tickets{% if unread_tickets %} · <strong>{{ unread_tickets }} new</strong>{% endif %}</div>
+        </div>
       </div>
+
+      <!-- Recent tickets preview -->
+      {% if recent_tickets %}
+      <div class="admin-section-title" style="margin-top:28px">Recent Support Messages</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Date</th><th>From</th><th>Message</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for t in recent_tickets %}
+            <tr style="{{ 'font-weight:600' if not t.is_read else '' }}">
+              <td style="font-size:11px;color:var(--text-3);white-space:nowrap">{{ t.created_at.strftime('%d %b %Y') }}</td>
+              <td style="font-size:13px">
+                {{ t.name }}<br>
+                <span style="font-size:11px;color:var(--text-3)">{{ t.email }}</span>
+              </td>
+              <td style="font-size:12px;color:var(--text-2);max-width:260px">
+                {{ t.message[:80] }}{% if t.message|length > 80 %}…{% endif %}
+                {% if t.replies|length %}
+                <span class="badge badge-user" style="font-size:10px;margin-left:4px">{{ t.replies|length }} repl{{ 'y' if t.replies|length == 1 else 'ies' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {{ 'badge-off' if t.is_closed else 'badge-active' }}">
+                  {{ 'Closed' if t.is_closed else 'Open' }}
+                </span>
+                {% if not t.is_read %}<span class="badge" style="background:var(--mint);color:#0a0a1a;font-size:10px">New</span>{% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('admin_view_ticket', ticket_id=t.id) }}" class="btn-sm">View →</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px">
+        <a href="{{ url_for('admin_messages') }}" class="btn-ghost" style="font-size:13px">View all messages →</a>
+      </div>
+      {% endif %}
 
       <!-- Recent payments -->
       <div class="admin-section-title">Recent Support Payments</div>

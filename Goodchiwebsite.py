@@ -104,17 +104,47 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 class ContactMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), nullable=False)
-    message = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(100), nullable=False)
+    email      = db.Column(db.String(120), nullable=False)
+    message    = db.Column(db.Text, nullable=False)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    is_read = db.Column(db.Boolean, default=False)
+    is_read    = db.Column(db.Boolean, default=False)
+    is_closed  = db.Column(db.Boolean, default=False)
+    subject    = db.Column(db.String(200), nullable=True)
+    replies    = db.relationship('ContactReply', backref='ticket', lazy=True,
+                                 cascade='all,delete', order_by='ContactReply.created_at')
 
     def __repr__(self):
         return f'<ContactMessage {self.name} - {self.created_at}>'
 
+
+class ContactReply(db.Model):
+    __tablename__ = 'contact_reply'
+    id             = db.Column(db.Integer, primary_key=True)
+    ticket_id      = db.Column(db.Integer, db.ForeignKey('contact_message.id'), nullable=False)
+    author_id      = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    body           = db.Column(db.Text, nullable=False)
+    is_admin_reply = db.Column(db.Boolean, default=False)
+    read_by_user   = db.Column(db.Boolean, default=False)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    author         = db.relationship('User', backref='contact_replies', lazy=True)
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_token'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token      = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used       = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user       = db.relationship('User', backref='reset_tokens', lazy=True)
+
+    @property
+    def is_valid(self):
+        return not self.used and datetime.utcnow() < self.expires_at
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
@@ -975,20 +1005,26 @@ def admin_dashboard():
     all_db_posts    = Post.query.order_by(Post.created_at.desc()).all()
     download_items    = DownloadItem.query.order_by(DownloadItem.sort_order, DownloadItem.created_at).all()
     recent_broadcasts = BroadcastLog.query.order_by(BroadcastLog.created_at.desc()).limit(10).all()
+    open_tickets      = ContactMessage.query.filter_by(is_closed=False).count()
+    unread_tickets    = ContactMessage.query.filter_by(is_read=False, is_closed=False).count()
+    recent_tickets    = ContactMessage.query.order_by(ContactMessage.created_at.desc()).limit(10).all()
 
     return render_template('admin_dashboard.html',
-        total_users     = total_users,
-        total_payments  = total_payments,
-        total_supported = total_supported,
-        total_posts     = total_posts,
-        recent_payments = recent_payments,
-        all_payments    = all_payments,
-        all_users       = all_users,
-        bank_details    = bank_details,
-        crypto_wallets  = crypto_wallets,
-        all_db_posts    = all_db_posts,
-        download_items     = download_items,
-        recent_broadcasts  = recent_broadcasts,
+        total_users       = total_users,
+        total_payments    = total_payments,
+        total_supported   = total_supported,
+        total_posts       = total_posts,
+        recent_payments   = recent_payments,
+        all_payments      = all_payments,
+        all_users         = all_users,
+        bank_details      = bank_details,
+        crypto_wallets    = crypto_wallets,
+        all_db_posts      = all_db_posts,
+        download_items    = download_items,
+        recent_broadcasts = recent_broadcasts,
+        open_tickets      = open_tickets,
+        unread_tickets    = unread_tickets,
+        recent_tickets    = recent_tickets,
     )
 
 
@@ -1069,15 +1105,322 @@ def admin_delete_wallet(wallet_id):
     flash('Wallet address deleted.', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# ── Startup: create tables + seed posts ──────────────────────
+
+# ══════════════════════════════════════════════════════════════
+#  ADMIN — SUPPORT MESSAGES / TICKETS
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/admin/messages')
+@admin_required
+def admin_messages():
+    status  = request.args.get('status', 'open')
+    query   = ContactMessage.query
+    if status == 'open':
+        query = query.filter_by(is_closed=False)
+    elif status == 'closed':
+        query = query.filter_by(is_closed=True)
+    tickets = query.order_by(ContactMessage.created_at.desc()).all()
+    for t in tickets:
+        if not t.is_read:
+            t.is_read = True
+    db.session.commit()
+    return render_template('admin_messages.html', tickets=tickets, status=status)
+
+
+@app.route('/admin/messages/<int:ticket_id>')
+@admin_required
+def admin_view_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    ticket.is_read = True
+    db.session.commit()
+    return render_template('admin_ticket_view.html', ticket=ticket)
+
+
+@app.route('/admin/messages/<int:ticket_id>/reply', methods=['POST'])
+@admin_required
+def admin_reply_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    body   = request.form.get('body', '').strip()
+    if not body:
+        flash('Reply cannot be empty.', 'danger')
+        return redirect(url_for('admin_view_ticket', ticket_id=ticket_id))
+
+    reply = ContactReply(
+        ticket_id      = ticket_id,
+        author_id      = current_user.id,
+        body           = body,
+        is_admin_reply = True,
+        read_by_user   = False,
+    )
+    db.session.add(reply)
+
+    # In-app notification for the ticket owner
+    n = Notification(
+        user_id = ticket.user_id,
+        type    = 'announcement',
+        title   = 'New reply to your support message',
+        message = body[:120] + ('…' if len(body) > 120 else ''),
+        link    = url_for('view_ticket', ticket_id=ticket_id),
+    )
+    db.session.add(n)
+
+    # Email the user
+    try:
+        msg = Message(
+            subject    = 'Re: Your support message — Goodchi Experience',
+            recipients = [ticket.email],
+            html       = f'''
+                <p>Hi {ticket.name},</p>
+                <p>You have a new reply to your support message:</p>
+                <blockquote style="border-left:3px solid #00f5c4;padding-left:12px;color:#555">
+                  {body.replace(chr(10), "<br>")}
+                </blockquote>
+                <p><a href="{url_for('view_ticket', ticket_id=ticket_id, _external=True)}">
+                  View the full conversation →</a></p>
+                <p style="font-size:12px;color:#999">— The Goodchi Experience Team</p>
+            ''',
+            body = f'Hi {ticket.name},\n\nNew reply:\n\n{body}\n\n— Goodchi Experience',
+        )
+        mail.send(msg)
+    except Exception as e:
+        app.logger.warning('Reply email failed: %s', e)
+
+    db.session.commit()
+    flash('Reply sent.', 'success')
+    return redirect(url_for('admin_view_ticket', ticket_id=ticket_id))
+
+
+@app.route('/admin/messages/<int:ticket_id>/close', methods=['POST'])
+@admin_required
+def admin_close_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    ticket.is_closed = True
+    db.session.commit()
+    flash('Ticket closed.', 'success')
+    return redirect(url_for('admin_messages'))
+
+
+@app.route('/admin/messages/<int:ticket_id>/reopen', methods=['POST'])
+@admin_required
+def admin_reopen_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    ticket.is_closed = False
+    db.session.commit()
+    flash('Ticket reopened.', 'success')
+    return redirect(url_for('admin_view_ticket', ticket_id=ticket_id))
+
+
+@app.route('/admin/messages/<int:ticket_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    db.session.delete(ticket)
+    db.session.commit()
+    flash('Ticket deleted.', 'success')
+    return redirect(url_for('admin_messages'))
+
+
+# ══════════════════════════════════════════════════════════════
+#  USER — VIEW OWN TICKET THREAD
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/contact/ticket/<int:ticket_id>')
+@login_required
+def view_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    if ticket.user_id != current_user.id and not current_user.is_admin:
+        abort(403)
+    # Mark admin replies as seen
+    for r in ticket.replies:
+        if r.is_admin_reply and not r.read_by_user:
+            r.read_by_user = True
+    db.session.commit()
+    return render_template('ticket_view.html', ticket=ticket)
+
+
+@app.route('/contact/ticket/<int:ticket_id>/reply', methods=['POST'])
+@login_required
+def reply_ticket(ticket_id):
+    ticket = ContactMessage.query.get_or_404(ticket_id)
+    if ticket.user_id != current_user.id and not current_user.is_admin:
+        abort(403)
+    body = request.form.get('body', '').strip()
+    if not body:
+        flash('Reply cannot be empty.', 'danger')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+    reply = ContactReply(
+        ticket_id      = ticket_id,
+        author_id      = current_user.id,
+        body           = body,
+        is_admin_reply = False,
+        read_by_user   = True,
+    )
+    if ticket.is_closed:
+        ticket.is_closed = False   # user reply re-opens ticket
+    db.session.add(reply)
+    db.session.commit()
+    flash('Follow-up sent.', 'success')
+    return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+
+# ══════════════════════════════════════════════════════════════
+#  PASSWORD RESET
+# ══════════════════════════════════════════════════════════════
+
+def _send_reset_email(user, token):
+    reset_url = url_for('password_reset_confirm', token=token, _external=True)
+    try:
+        msg = Message(
+            subject    = 'Reset your Goodchi Experience password',
+            recipients = [user.email],
+            html       = f'''
+                <h2>Password Reset</h2>
+                <p>Hi {user.username},</p>
+                <p>Click below to reset your password. This link expires in <strong>30 minutes</strong>.</p>
+                <p><a href="{reset_url}"
+                      style="display:inline-block;padding:12px 24px;background:#00f5c4;
+                             color:#0a0a1a;text-decoration:none;border-radius:6px;font-weight:700">
+                  Reset Password →</a></p>
+                <p style="font-size:12px;color:#999">
+                  If you didn't request this, ignore this email.</p>
+            ''',
+            body = f'Hi {user.username},\n\nReset link (expires in 30 min):\n{reset_url}\n\nIgnore if you didn\'t request this.',
+        )
+        mail.send(msg)
+        return True
+    except Exception as e:
+        app.logger.error('Reset email failed: %s', e)
+        return False
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        user  = User.query.filter(db.func.lower(User.email) == email).first()
+        # Same message whether email exists or not — prevents enumeration
+        flash('If that email is registered, a reset link has been sent.', 'info')
+        if user:
+            PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
+            db.session.commit()
+            token = _secrets.token_urlsafe(48)
+            prt   = PasswordResetToken(
+                user_id    = user.id,
+                token      = token,
+                expires_at = datetime.utcnow() + timedelta(minutes=30),
+            )
+            db.session.add(prt)
+            db.session.commit()
+            _send_reset_email(user, token)
+        return redirect(url_for('forgot_password'))
+    return render_template('forgot_password.html')
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def password_reset_confirm(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    prt = PasswordResetToken.query.filter_by(token=token).first()
+    if not prt or not prt.is_valid:
+        flash('This reset link is invalid or has expired.', 'danger')
+        return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        new_pw     = request.form.get('new_password', '')
+        confirm_pw = request.form.get('confirm_password', '')
+        if len(new_pw) < 8:
+            flash('Password must be at least 8 characters.', 'danger')
+            return redirect(url_for('password_reset_confirm', token=token))
+        if new_pw != confirm_pw:
+            flash('Passwords do not match.', 'danger')
+            return redirect(url_for('password_reset_confirm', token=token))
+        prt.user.set_password(new_pw)
+        prt.used = True
+        db.session.commit()
+        flash('✅ Password updated! You can now log in.', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html', token=token)
+
+
+# ── One-time admin promotion ───────────────────────────────────
+@app.route('/make-me-admin')
+@login_required
+def make_me_admin():
+    setup_key = os.getenv('ADMIN_SETUP_KEY', '')
+    provided  = request.args.get('key', '')
+    if not setup_key:
+        flash('Admin setup key not configured.', 'danger')
+        return redirect(url_for('home'))
+    if not provided or provided != setup_key:
+        flash('Invalid setup key.', 'danger')
+        return redirect(url_for('home'))
+    if current_user.is_admin:
+        flash(f'Already an admin, {current_user.username}.', 'info')
+        return redirect(url_for('admin_dashboard'))
+    current_user.is_admin = True
+    db.session.commit()
+    flash(f'✅ {current_user.username} is now an admin!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# ── Startup: create tables + migrate columns + seed posts ─────
 # Runs under both gunicorn (Render) and the dev server.
+def _run_startup_migrations():
+    """Add any missing columns to existing tables. Safe to call repeatedly."""
+    from sqlalchemy import text, inspect as sa_inspect
+
+    def col_exists(table, col):
+        try:
+            inspector = sa_inspect(db.engine)
+            return col in [c['name'] for c in inspector.get_columns(table)]
+        except Exception:
+            return False
+
+    pending = [
+        # contact_message new columns
+        ('contact_message', 'is_closed', 'BOOLEAN DEFAULT 0 NOT NULL'),
+        ('contact_message', 'subject',   'VARCHAR(200)'),
+        # user new columns
+        ('user', 'bio',                  'TEXT'),
+        ('user', 'avatar',               'VARCHAR(256)'),
+        ('user', 'notif_new_posts',      'BOOLEAN DEFAULT 1 NOT NULL'),
+        ('user', 'notif_new_music',      'BOOLEAN DEFAULT 1 NOT NULL'),
+        ('user', 'notif_announcements',  'BOOLEAN DEFAULT 1 NOT NULL'),
+        ('user', 'notif_email',          'BOOLEAN DEFAULT 0 NOT NULL'),
+        ('user', 'totp_secret',          'VARCHAR(32)'),
+        ('user', 'totp_enabled',         'BOOLEAN DEFAULT 0 NOT NULL'),
+        ('user', 'totp_pending',         'VARCHAR(32)'),
+    ]
+
+    with db.engine.connect() as conn:
+        for table, col, defn in pending:
+            if not col_exists(table, col):
+                try:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {defn}'))
+                    conn.commit()
+                    print(f'[migrate] added {table}.{col}')
+                except Exception as e:
+                    print(f'[migrate] skip {table}.{col}: {e}')
+
+
 with app.app_context():
-    db.create_all()
+    db.create_all()           # creates any brand-new tables
+    _run_startup_migrations() # adds missing columns to existing tables
     try:
         from seed_db import seed_posts
         seed_posts(verbose=False)
     except Exception as _seed_err:
         print(f"[seed] skipped: {_seed_err}")
+
+    # Auto-promote ADMIN_EMAIL user on startup
+    _admin_email = os.getenv('ADMIN_EMAIL', '')
+    if _admin_email:
+        _admin_user = User.query.filter_by(email=_admin_email).first()
+        if _admin_user and not _admin_user.is_admin:
+            _admin_user.is_admin = True
+            db.session.commit()
+            print(f"[startup] Promoted {_admin_email} to admin.")
 
 if __name__ == '__main__':
     app.run(debug=True)
