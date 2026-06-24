@@ -41,6 +41,15 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 3600,
 }
 
+_db_url = (
+    os.getenv('DATABASE_URL') or
+    os.getenv('SQLALCHEMY_DATABASE_URI') or
+    'sqlite:///goodchi.db'
+)
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
+
 # Email configuration
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
@@ -1408,7 +1417,6 @@ with app.app_context():
     db.create_all()           # creates any brand-new tables
     _run_startup_migrations() # adds missing columns to existing tables
     try:
-        from seed_db import seed_posts
         seed_posts(verbose=False)
     except Exception as _seed_err:
         print(f"[seed] skipped: {_seed_err}")
