@@ -379,6 +379,10 @@ def register():
         try:
             user = User(username=form.username.data, email=form.email.data)
             user.set_password(form.password.data)
+            #auto-grant admin if this email matches ADMIN_EMAIL env var
+            _admin_email = os.getenv('ADMIN_EMAIL', '').strip().lower()
+            if user.email.strip().lower() == _admin_email:
+                user.is_admin = True
             db.session.add(user)
             db.session.commit()
 
