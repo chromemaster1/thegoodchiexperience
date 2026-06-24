@@ -33,22 +33,23 @@ if not SECRET_KEY:
 app.config['SECRET_KEY'] = SECRET_KEY
 
 # Database configuration - supports both SQLite (dev) and PostgreSQL (production)
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///goodchi.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 3600,
-}
-
+# Uses psycopg3 (psycopg[binary]) which supports Python 3.14+
 _db_url = (
     os.getenv('DATABASE_URL') or
     os.getenv('SQLALCHEMY_DATABASE_URI') or
     'sqlite:///goodchi.db'
 )
+# Render emits postgres:// — rewrite for psycopg3 dialect
 if _db_url.startswith('postgres://'):
-    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    _db_url = _db_url.replace('postgres://', 'postgresql+psycopg://', 1)
+elif _db_url.startswith('postgresql://'):
+    _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 3600,
+}
 
 # Email configuration
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
@@ -61,7 +62,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', app.config.
 
 # # Session configuration - add timeout
 # app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')  # True in production with HTTPS
+app.config['SESSION_COOKIE_SECURE'] = bool(os.getenv('RENDER', ''))  # Auto-detect Render (always HTTPS)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
