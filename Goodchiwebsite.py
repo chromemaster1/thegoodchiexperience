@@ -24,6 +24,14 @@ import base64
 
 load_dotenv()
 
+# Import seed data — must come after load_dotenv so env vars are available
+try:
+    from seed_db import seed_posts
+except Exception as _seed_import_err:
+    print(f"[seed_db] import failed: {_seed_import_err}")
+    def seed_posts(verbose=False):
+        return 0
+
 app = Flask(__name__)
 
 # Security: Use environment variable for SECRET_KEY, raise error if not set
@@ -1358,25 +1366,67 @@ def password_reset_confirm(token):
     return render_template('reset_password.html', token=token)
 
 
-# ── One-time admin promotion ───────────────────────────────────
-@app.route('/make-me-admin')
-@login_required
+# ── One-time admin promotion ─────────────────────────────────────────
+# No @login_required — works even if session cookie is broken.
+# Usage: /make-me-admin  (shows a form)
+#        POST with email + key, or GET /make-me-admin?key=KEY&email=EMAIL
+@app.route('/make-me-admin', methods=['GET', 'POST'])
 def make_me_admin():
-    setup_key = os.getenv('ADMIN_SETUP_KEY', '')
-    provided  = request.args.get('key', '')
+    setup_key = os.getenv('ADMIN_SETUP_KEY', '').strip()
+    provided  = (request.form.get('key') or request.args.get('key') or '').strip()
+    target_email = (request.form.get('email') or request.args.get('email') or '').strip().lower()
+
+    # Show the form when visiting with no params
+    if request.method == 'GET' and not provided:
+        return '''<!DOCTYPE html>
+<html><body style="font-family:sans-serif;max-width:420px;margin:80px auto;padding:24px;
+  background:#0f0f23;color:#eee;border-radius:12px;border:1px solid #8a2be2">
+<h2 style="color:#00d4ff">&#128274; Admin Promotion</h2>
+<form method="POST">
+  <label style="display:block;margin-bottom:4px">Email to promote:</label>
+  <input name="email" type="email" required
+    style="width:100%;padding:10px;margin-bottom:14px;background:#1e1e3c;
+           color:#fff;border:1px solid #8a2be2;border-radius:6px;box-sizing:border-box"><br>
+  <label style="display:block;margin-bottom:4px">Admin Setup Key:</label>
+  <input name="key" type="text" required
+    style="width:100%;padding:10px;margin-bottom:14px;background:#1e1e3c;
+           color:#fff;border:1px solid #8a2be2;border-radius:6px;box-sizing:border-box"><br>
+  <button type="submit"
+    style="width:100%;padding:12px;background:linear-gradient(135deg,#8a2be2,#00d4ff);
+           color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer">
+    Promote to Admin
+  </button>
+</form></body></html>'''
+
+    # Validate setup key
     if not setup_key:
-        flash('Admin setup key not configured.', 'danger')
-        return redirect(url_for('home'))
+        return '<p style="font-family:sans-serif;color:red">ADMIN_SETUP_KEY not set in environment variables.</p>', 500
     if not provided or provided != setup_key:
-        flash('Invalid setup key.', 'danger')
-        return redirect(url_for('home'))
-    if current_user.is_admin:
-        flash(f'Already an admin, {current_user.username}.', 'info')
-        return redirect(url_for('admin_dashboard'))
-    current_user.is_admin = True
+        return '<p style="font-family:sans-serif;color:red">Invalid setup key.</p>', 403
+
+    # Find the user
+    if not target_email:
+        return '<p style="font-family:sans-serif;color:red">No email provided.</p>', 400
+    user = User.query.filter_by(email=target_email).first()
+    if not user:
+        return f'<p style="font-family:sans-serif;color:red">No user found with email: {target_email}</p>', 404
+
+    if user.is_admin:
+        return f'''<p style="font-family:sans-serif;color:green">
+            &#10003; {user.email} is already an admin.
+            <a href="/login">Login</a></p>''', 200
+
+    user.is_admin = True
     db.session.commit()
-    flash(f'✅ {current_user.username} is now an admin!', 'success')
-    return redirect(url_for('admin_dashboard'))
+    return f'''<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:420px;
+        margin:80px auto;padding:24px;background:#0f0f23;color:#eee;
+        border-radius:12px;border:1px solid #22c55e">
+        <h2 style="color:#22c55e">&#10003; Success!</h2>
+        <p><strong>{user.email}</strong> is now an admin.</p>
+        <a href="/login" style="display:inline-block;padding:10px 20px;
+           background:linear-gradient(135deg,#8a2be2,#00d4ff);color:#fff;
+           border-radius:6px;text-decoration:none">Login Now</a>
+        </body></html>''', 200
 
 # ── Startup: create tables + migrate columns + seed posts ─────
 # Runs under both gunicorn (Render) and the dev server.
@@ -1421,19 +1471,28 @@ def _run_startup_migrations():
 with app.app_context():
     db.create_all()           # creates any brand-new tables
     _run_startup_migrations() # adds missing columns to existing tables
-    try:
-        seed_posts(verbose=False)
-    except Exception as _seed_err:
-        print(f"[seed] skipped: {_seed_err}")
 
-    # Auto-promote ADMIN_EMAIL user on startup
-    _admin_email = os.getenv('ADMIN_EMAIL', '')
+    # Seed posts from seed_db.py
+    try:
+        _inserted = seed_posts(verbose=False)
+        print(f"[seed] OK — {_inserted} new posts inserted")
+    except Exception as _seed_err:
+        print(f"[seed] ERROR: {_seed_err}")
+
+    # Auto-promote ADMIN_EMAIL user on every startup (covers existing users too)
+    _admin_email = os.getenv('ADMIN_EMAIL', '').strip().lower()
     if _admin_email:
-        _admin_user = User.query.filter_by(email=_admin_email).first()
+        _admin_user = User.query.filter(
+            db.func.lower(User.email) == _admin_email
+        ).first()
         if _admin_user and not _admin_user.is_admin:
             _admin_user.is_admin = True
             db.session.commit()
             print(f"[startup] Promoted {_admin_email} to admin.")
+        elif _admin_user and _admin_user.is_admin:
+            print(f"[startup] {_admin_email} is already admin — OK.")
+        else:
+            print(f"[startup] ADMIN_EMAIL={_admin_email} not yet registered — will be promoted on registration.")
 
 if __name__ == '__main__':
     app.run(debug=True)
