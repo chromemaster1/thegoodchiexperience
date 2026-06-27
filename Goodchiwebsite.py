@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
 from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from flask_limiter.util import get_remote_address
@@ -1362,65 +1362,60 @@ def password_reset_confirm(token):
 
 
 # ── One-time admin promotion ─────────────────────────────────────────
-# No @login_required — works even if session cookie is broken.
-# Usage: /make-me-admin  (shows a form)
-#        POST with email + key, or GET /make-me-admin?key=KEY&email=EMAIL
-@app.route('/make-me-admin', methods=['GET', 'POST'])
+# GET-only — no POST, no CSRF issue.
+# Visit: /make-me-admin               → shows instructions
+# Visit: /make-me-admin?key=KEY&email=EMAIL  → promotes the user
+@app.route('/make-me-admin', methods=['GET'])
 def make_me_admin():
-    setup_key = os.getenv('ADMIN_SETUP_KEY', '').strip()
-    provided  = (request.form.get('key') or request.args.get('key') or '').strip()
-    target_email = (request.form.get('email') or request.args.get('email') or '').strip().lower()
+    setup_key    = os.getenv('ADMIN_SETUP_KEY', '').strip()
+    provided     = request.args.get('key', '').strip()
+    target_email = request.args.get('email', '').strip().lower()
 
-    # Show the form when visiting with no params
-    if request.method == 'GET' and not provided:
-        return '''<!DOCTYPE html>
-<html><body style="font-family:sans-serif;max-width:420px;margin:80px auto;padding:24px;
+    S = 'font-family:sans-serif'
+
+    # No params — show usage instructions
+    if not provided and not target_email:
+        host = request.host_url.rstrip('/')
+        return f'''<!DOCTYPE html>
+<html><body style="{S};max-width:500px;margin:80px auto;padding:24px;
   background:#0f0f23;color:#eee;border-radius:12px;border:1px solid #8a2be2">
 <h2 style="color:#00d4ff">&#128274; Admin Promotion</h2>
-<form method="POST">
-  <label style="display:block;margin-bottom:4px">Email to promote:</label>
-  <input name="email" type="email" required
-    style="width:100%;padding:10px;margin-bottom:14px;background:#1e1e3c;
-           color:#fff;border:1px solid #8a2be2;border-radius:6px;box-sizing:border-box"><br>
-  <label style="display:block;margin-bottom:4px">Admin Setup Key:</label>
-  <input name="key" type="text" required
-    style="width:100%;padding:10px;margin-bottom:14px;background:#1e1e3c;
-           color:#fff;border:1px solid #8a2be2;border-radius:6px;box-sizing:border-box"><br>
-  <button type="submit"
-    style="width:100%;padding:12px;background:linear-gradient(135deg,#8a2be2,#00d4ff);
-           color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer">
-    Promote to Admin
-  </button>
-</form></body></html>'''
+<p>Add your email and setup key to the URL:</p>
+<code style="display:block;background:#1e1e3c;padding:12px;border-radius:6px;
+  word-break:break-all;color:#00d4ff;margin:16px 0">
+{host}/make-me-admin?key=YOUR_SETUP_KEY&amp;email=YOUR_EMAIL
+</code>
+<p style="color:#aaa;font-size:13px">
+  Replace YOUR_SETUP_KEY with the ADMIN_SETUP_KEY env var value.<br>
+  Replace YOUR_EMAIL with the account email you registered with.
+</p>
+</body></html>''', 200
 
-    # Validate setup key
+    # Validate key
     if not setup_key:
-        return '<p style="font-family:sans-serif;color:red">ADMIN_SETUP_KEY not set in environment variables.</p>', 500
-    if not provided or provided != setup_key:
-        return '<p style="font-family:sans-serif;color:red">Invalid setup key.</p>', 403
-
-    # Find the user
+        return f'<p style="{S};color:red">ADMIN_SETUP_KEY not set in Render environment variables.</p>', 500
+    if provided != setup_key:
+        return f'<p style="{S};color:red">Invalid setup key.</p>', 403
     if not target_email:
-        return '<p style="font-family:sans-serif;color:red">No email provided.</p>', 400
-    user = User.query.filter_by(email=target_email).first()
+        return f'<p style="{S};color:red">No email provided. Add ?email=you@example.com to the URL.</p>', 400
+
+    user = User.query.filter(db.func.lower(User.email) == target_email).first()
     if not user:
-        return f'<p style="font-family:sans-serif;color:red">No user found with email: {target_email}</p>', 404
+        return f'<p style="{S};color:red">No user found with email: {target_email}. Register first.</p>', 404
 
     if user.is_admin:
-        return f'''<p style="font-family:sans-serif;color:green">
-            &#10003; {user.email} is already an admin.
-            <a href="/login">Login</a></p>''', 200
+        return f'<p style="{S};color:green">&#10003; {user.email} is already an admin. <a href="/login">Login</a></p>', 200
 
     user.is_admin = True
     db.session.commit()
-    return f'''<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:420px;
+    return f'''<!DOCTYPE html><html><body style="{S};max-width:420px;
         margin:80px auto;padding:24px;background:#0f0f23;color:#eee;
         border-radius:12px;border:1px solid #22c55e">
-        <h2 style="color:#22c55e">&#10003; Success!</h2>
+        <h2 style="color:#22c55e">&#10003; Done!</h2>
         <p><strong>{user.email}</strong> is now an admin.</p>
         <a href="/login" style="display:inline-block;padding:10px 20px;
            background:linear-gradient(135deg,#8a2be2,#00d4ff);color:#fff;
-           border-radius:6px;text-decoration:none">Login Now</a>
+           border-radius:6px;text-decoration:none;margin-top:12px">Login Now &#8594;</a>
         </body></html>''', 200
 
 # Seed posts inlined here to avoid circular import (seed_db.py imports from this file)
@@ -1446,9 +1441,6 @@ def seed_posts(verbose=False):
     if verbose:
         print(f"[seed] {inserted} posts inserted, {len(existing)} already present")
     return inserted
-
-# Register the CSRF exemption for make_me_admin (must be done after function is defined)
-csrf.exempt(make_me_admin)
 
 # ── Startup: create tables + migrate columns + seed posts ─────
 # Runs under both gunicorn (Render) and the dev server.
