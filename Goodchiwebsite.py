@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
 from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect, generate_csrf, exempt
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from wtforms import StringField, PasswordField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from flask_limiter.util import get_remote_address
@@ -19,6 +19,7 @@ import pyotp
 import qrcode
 import io
 import base64
+
 
 
 load_dotenv()
@@ -70,6 +71,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db = SQLAlchemy(app)
 mail = Mail(app)
 csrf = CSRFProtect(app)
+# Exempt the admin promotion route — standalone tool, no session/CSRF needed
+# csrf.exempt() is the correct API for Flask-WTF 1.2.x
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -1363,7 +1366,6 @@ def password_reset_confirm(token):
 # Usage: /make-me-admin  (shows a form)
 #        POST with email + key, or GET /make-me-admin?key=KEY&email=EMAIL
 @app.route('/make-me-admin', methods=['GET', 'POST'])
-@exempt
 def make_me_admin():
     setup_key = os.getenv('ADMIN_SETUP_KEY', '').strip()
     provided  = (request.form.get('key') or request.args.get('key') or '').strip()
@@ -1444,6 +1446,9 @@ def seed_posts(verbose=False):
     if verbose:
         print(f"[seed] {inserted} posts inserted, {len(existing)} already present")
     return inserted
+
+# Register the CSRF exemption for make_me_admin (must be done after function is defined)
+csrf.exempt(make_me_admin)
 
 # ── Startup: create tables + migrate columns + seed posts ─────
 # Runs under both gunicorn (Render) and the dev server.
