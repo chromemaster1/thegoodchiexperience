@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
 from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, generate_csrf, exempt
 from wtforms import StringField, PasswordField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from flask_limiter.util import get_remote_address
@@ -21,16 +21,8 @@ import io
 import base64
 
 
-
 load_dotenv()
 
-# Import seed data — must come after load_dotenv so env vars are available
-try:
-    from seed_db import seed_posts
-except Exception as _seed_import_err:
-    print(f"[seed_db] import failed: {_seed_import_err}")
-    def seed_posts(verbose=False):
-        return 0
 
 app = Flask(__name__)
 
@@ -1371,6 +1363,7 @@ def password_reset_confirm(token):
 # Usage: /make-me-admin  (shows a form)
 #        POST with email + key, or GET /make-me-admin?key=KEY&email=EMAIL
 @app.route('/make-me-admin', methods=['GET', 'POST'])
+@exempt
 def make_me_admin():
     setup_key = os.getenv('ADMIN_SETUP_KEY', '').strip()
     provided  = (request.form.get('key') or request.args.get('key') or '').strip()
@@ -1427,6 +1420,30 @@ def make_me_admin():
            background:linear-gradient(135deg,#8a2be2,#00d4ff);color:#fff;
            border-radius:6px;text-decoration:none">Login Now</a>
         </body></html>''', 200
+
+# Seed posts inlined here to avoid circular import (seed_db.py imports from this file)
+_SEED_POSTS = [
+    {"slug":"welcoming-intro","title":"Welcoming Intro to the Portfolio","excerpt":"I have taken the time to create a beautiful server where my portfolio of works can live, and you can view and tag along — we might make some fun music or code something fun while on our adventure, who knows.","content":"<p>I have taken the time to create a beautiful server where my portfolio of works can live, and you can view and tag along. This portfolio represents years of dedication to both music and software development.</p>","date":"October 29, 2025","image":"images/play_15606020.png"},
+    {"slug":"journey-founder-creative","title":"My Journey: As Founder and Creative Entrepreneur","excerpt":"Since we registered the company in 2023 on my birthday, it has been a beautiful learning curve — several projects, milestones met, and some tough circumstances. But what is life without challenges?","content":"<p>Since we registered the company in 2023 on my birthday, it has been a beautiful learning curve. Building a company from scratch taught me resilience, adaptability, and the importance of surrounding yourself with the right people.</p>","date":"April 28, 2023","image":"images/customer-journey_17247993.png"},
+    {"slug":"who-knew-release","title":"Who Knew — Release of Our First Studio Project as Goodchi","excerpt":"This was really the beginning of everything we have been doing — not only our first break into the creative industry, but a marking point of me no longer sitting on the sidelines with my craft and skillsets.","content":"<p><em>Who Knew</em> was more than a song — it was a testament to the fact that no matter how long it takes, you can accomplish that goal or dream.</p><h3>Watch the Video</h3><div style=\"position:relative;width:100%;max-width:600px;margin:20px 0\"><iframe width=\"100%\" height=\"400\" src=\"https://www.youtube.com/embed/ayJSSqSU6BU\" title=\"Who Knew\" frameborder=\"0\" allowfullscreen style=\"border-radius:8px\"></iframe></div>","date":"November 18, 2023","image":"images/Who knew art.jpeg"},
+    {"slug":"cookie-clicker-game","title":"Cookie Clicker Game — A Web-Based Game Experience","excerpt":"A web-based game I developed that lets users click cookies and earn cookie money to purchase upgrades and other fun stuff — a project built to test coding skills and have fun with it.","content":"<p>The Cookie Clicker game was initially developed as a personal testing project for my private entertainment, but it can be fully developed and deployed for commercial or personal use.</p>","date":"February 12, 2024","image":"images/cookie_3245050.png"},
+    {"slug":"genesis-ep-project","title":"The Genesis EP Project — A Debut That Resonates","excerpt":"Dropped our first debut EP — Genesis — that has gone on massively, with hits like 247pnb, Sticks n Bones, Say Your Mine and Girls Like You standing out as fan favourites.","content":"<p>The timing and making of this project was crucial — it came during a period of personal challenges, but I refused to let that stand in the way of putting it out for the world. Genesis became more than an EP; it became a statement.</p>","date":"April 18, 2024","image":"images/genesis-art.jpeg"},
+    {"slug":"infodorm-news-data","title":"Infodorm — News and Data Retrieval Platform","excerpt":"A news and data retrieval site I created that shares insight on current events and lets users pull information around any topic — best suited for researchers and creators.","content":"<p>I was going for a regular media site, but I realised that researchers and creators spend a ton of time searching the web. Infodorm bridges the gap between curiosity and information.</p>","date":"April 25, 2024","image":"images/infodorm-logo1.jpeg"},
+    {"slug":"stranger-things-single","title":"Stranger Things Dey Happen — 2nd Single of 2025","excerpt":"Dropped my 2nd highly anticipated single of the year 2025.","content":"<p>The target for the year was to give my fans raw, uncategorised music — 6 different singles — and see how they respond to each one. Stranger things are indeed happening, and I am grateful to share this journey with you all.</p>","date":"May 11, 2025","image":"images/pic07.jpg"},
+]
+
+def seed_posts(verbose=False):
+    existing = {r.slug for r in Post.query.with_entities(Post.slug).all()}
+    inserted = 0
+    for data in _SEED_POSTS:
+        if data["slug"] not in existing:
+            db.session.add(Post(**data))
+            inserted += 1
+    if inserted:
+        db.session.commit()
+    if verbose:
+        print(f"[seed] {inserted} posts inserted, {len(existing)} already present")
+    return inserted
 
 # ── Startup: create tables + migrate columns + seed posts ─────
 # Runs under both gunicorn (Render) and the dev server.
